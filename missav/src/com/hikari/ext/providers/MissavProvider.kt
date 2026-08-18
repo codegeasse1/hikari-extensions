@@ -94,7 +94,7 @@ class MissavProvider : HikariProvider {
                 if (isNotEmpty()) append("\n")
                 append("Runtime: ").append(formatDuration(durationSec))
             }
-            if (release.isNotBlank()) {
+            if (!release.isNullOrBlank()) {
                 if (isNotEmpty()) append(" · ")
                 append(release)
             }
