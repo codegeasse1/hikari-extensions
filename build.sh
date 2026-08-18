@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds an extension (default: chaturbate) → <name>.hiki
+# Builds every extension in the repo (<name>/manifest.json) → <name>.hiki,
+# then regenerates repo.json listing them all.
 # Needs: java 17+, jar (JDK), curl, unzip. Downloads kotlinc + deps on first run.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 KOTLINC_DIR="${KOTLINC_DIR:-./kotlinc}"
 DEPS="deps"
-EXT_NAME="${EXT_NAME:-chaturbate}"
 mkdir -p "$DEPS"
 
 fetch() {
@@ -36,24 +36,68 @@ mkdir -p build/sdk-out build/ext-out build/dex-out build/pkg
   sdk/HikariProvider.kt sdk/HikariNet.kt stubs/HttpStub.kt stubs/WebViewResolverStub.kt
 jar cf build/sdk.jar -C build/sdk-out .
 
-# 2) compile the extension against sdk.jar (coroutines on classpath so
-#    suspend helpers + kotlinx.coroutines.sync.Mutex resolve; at runtime the
-#    app's classloader provides kotlinx-coroutines)
-"$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:deps/json-20231013.jar:deps/kotlinx-coroutines-core-jvm-1.9.0.jar" -d build/ext-out \
-  "$EXT_NAME"/src/com/hikari/ext/providers/*.kt
-jar cf "build/$EXT_NAME.jar" -C build/ext-out .
+# 2..4) build every extension folder that has a manifest.json
+BUILT=""
+for dir in */; do
+  [ -f "$dir/manifest.json" ] || continue
+  name="${dir%/}"
+  echo "building $name"
+  rm -rf build/ext-out build/dex-out build/pkg
+  mkdir -p build/ext-out build/dex-out build/pkg
 
-# 3) dex the extension (SDK classes stay as external references)
-java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
-  --lib deps/android-4.1.1.4.jar \
-  --classpath build/sdk.jar \
-  --classpath deps/json-20231013.jar \
-  --classpath deps/kotlinx-coroutines-core-jvm-1.9.0.jar \
-  --output build/dex-out "build/$EXT_NAME.jar"
+  # compile against sdk.jar (coroutines on classpath so suspend helpers +
+  # kotlinx.coroutines.sync.Mutex resolve; at runtime the app's classloader
+  # provides kotlinx-coroutines)
+  "$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:deps/json-20231013.jar:deps/kotlinx-coroutines-core-jvm-1.9.0.jar" -d build/ext-out \
+    "$dir"src/com/hikari/ext/providers/*.kt
+  jar cf "build/$name.jar" -C build/ext-out .
 
-# 4) package .hiki = classes.dex + manifest.json
-cp build/dex-out/classes.dex build/pkg/
-cp "$EXT_NAME/manifest.json" build/pkg/
-jar cf "$EXT_NAME.hiki" -C build/pkg .
+  # dex the extension (SDK classes stay as external references)
+  java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
+    --lib deps/android-4.1.1.4.jar \
+    --classpath build/sdk.jar \
+    --classpath deps/json-20231013.jar \
+    --classpath deps/kotlinx-coroutines-core-jvm-1.9.0.jar \
+    --output build/dex-out "build/$name.jar"
 
-echo "built $EXT_NAME.hiki"
+  # package .hiki = classes.dex + manifest.json
+  cp build/dex-out/classes.dex build/pkg/
+  cp "$name/manifest.json" build/pkg/
+  jar cf "$name.hiki" -C build/pkg .
+
+  BUILT="$BUILT $name"
+  echo "built $name.hiki"
+done
+
+if [ -z "$BUILT" ]; then
+  echo "no extensions found" >&2
+  exit 1
+fi
+
+# 5) regenerate repo.json from the built .hiki files + their manifests
+generate_repo_json() {
+  echo "{"
+  echo "  \"name\": \"Hikari Extensions\","
+  echo "  \"description\": \"Official .hiki extensions for Hikari.\","
+  echo "  \"plugins\": ["
+  first=1
+  for name in $BUILT; do
+    [ $first -eq 0 ] && echo ","
+    first=0
+    local ver
+    ver=$(sed -n 's/.*"version"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$name/manifest.json" | head -1)
+    ver="${ver:-1}"
+    printf '    {\n'
+    printf '      "name": "%s",\n' "$(sed -n 's/.*"name"[^"]*"\([^"]*\)".*/\1/p' "$name/manifest.json" | head -1)"
+    printf '      "description": "%s",\n' "Auto-built Hikari extension from this repo."
+    printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.hiki",\n' "$name"
+    printf '      "version": %s,\n' "$ver"
+    printf '      "tvTypes": ["movie"]\n'
+    printf '    }'
+  done
+  echo ""
+  echo "  ]"
+  echo "}"
+}
+generate_repo_json > repo.json
+echo "repo.json updated with:$BUILT"

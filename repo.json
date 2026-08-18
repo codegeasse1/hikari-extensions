@@ -6,8 +6,14 @@
       "name": "Chaturbate (Hikari)",
       "description": "Live cam rooms — category rows, search, and live broadcasts in the built-in player.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.hiki",
-      "iconUrl": "",
       "version": 2,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "MissAV (JAV)",
+      "description": "Free JAV — new releases, hot today, uncensored leaks and 100k+ genre videos.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
+      "version": 1,
       "tvTypes": ["movie"]
     }
   ]

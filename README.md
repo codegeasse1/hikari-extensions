@@ -15,13 +15,15 @@ Hikari APK, so they are tiny, load with the app's hardened networking
 In Hikari (v0.3.21+): **Extensions → Add Hikari repo** and paste:
 
 ```
-https://raw.githubusercontent.com/codegeasse1/hikari-extensions/main/repo.json
+https://raw.githubusercontent.com/codegeasse1/hikari-extensions/builds/repo.json
 ```
 
 The repo (**Hikari Extensions**) then appears in the *Extension repos* list —
 tap it to see every extension it contains, and **Install / Uninstall** each one
-from there. The repo JSON is also published on every build to the continuous
-release, so the list always reflects the latest `.hiki` files.
+from there. `repo.json` is regenerated on every build and pushed to the
+`builds` branch (and to the continuous release), so new extensions show up
+automatically — no need to remove and re-add the repo; just reopen the
+Extensions screen or pull to refresh.
 
 ### Or install a single extension by URL
 
@@ -38,6 +40,7 @@ Or download `chaturbate.hiki` and use **Pick .hiki file**.
 | Extension | Description |
 |---|---|
 | `chaturbate.hiki` | Live cam rooms from chaturbate.com — public broadcasts play in the built-in player (signed LL-HLS). Uses only public, unauthenticated endpoints. |
+| `missav.hiki` | Free JAV from missav.ws — 100k+ videos across 12 home rows (new releases, hot today, uncensored leak, big breasts, mature woman, creampie, wife, …), genre browsing and search, LL-HLS in the built-in player. |
 
 ## Building an extension
 

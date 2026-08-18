@@ -25,7 +25,7 @@ jobs:
           path: kotlinc
           key: kotlinc-2.1.20
 
-      - name: Build
+      - name: Build all extensions + repo.json
         run: |
           set -o pipefail
           bash build.sh > build.log 2>&1
@@ -49,12 +49,14 @@ jobs:
           path: build.log
           if-no-files-found: ignore
 
-      - name: Upload artifact
+      - name: Upload artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: hiki
-          path: chaturbate.hiki
+          path: |
+            *.hiki
+            repo.json
           if-no-files-found: error
 
       - name: Publish to continuous release
@@ -63,9 +65,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload continuous chaturbate.hiki repo.json --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload continuous *.hiki repo.json --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create continuous chaturbate.hiki repo.json --repo "$GITHUB_REPOSITORY" \
+            gh release create continuous *.hiki repo.json --repo "$GITHUB_REPOSITORY" \
               --title "Continuous build" \
-              --notes "Chaturbate Hikari extension + repo.json, auto-built from main." || true
+              --notes "Hikari extensions + repo.json, auto-built from main." || true
           fi
+
+      - name: Publish repo.json to builds branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp repo.json /tmp/repo.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin builds >/dev/null 2>&1 && git checkout builds 2>/dev/null || git checkout --orphan builds
+          cp /tmp/repo.json repo.json
+          git add repo.json
+          git commit -m "repo: update repo.json $(date -u +%Y%m%d%H%M)" || true
+          git push origin builds --force
