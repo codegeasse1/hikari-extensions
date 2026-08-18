@@ -44,7 +44,8 @@ jar cf "build/$EXT_NAME.jar" -C build/ext-out .
 # 3) dex the extension (SDK classes stay as external references)
 java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
   --lib deps/android-4.1.1.4.jar \
-  --classpath "build/sdk.jar:deps/json-20231013.jar" \
+  --classpath build/sdk.jar \
+  --classpath deps/json-20231013.jar \
   --output build/dex-out "build/$EXT_NAME.jar"
 
 # 4) package .hiki = classes.dex + manifest.json
