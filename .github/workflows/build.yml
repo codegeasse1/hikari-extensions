@@ -63,9 +63,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload continuous chaturbate.hiki --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload continuous chaturbate.hiki repo.json --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create continuous chaturbate.hiki --repo "$GITHUB_REPOSITORY" \
+            gh release create continuous chaturbate.hiki repo.json --repo "$GITHUB_REPOSITORY" \
               --title "Continuous build" \
-              --notes "Chaturbate Hikari extension, auto-built from main." || true
+              --notes "Chaturbate Hikari extension + repo.json, auto-built from main." || true
           fi
