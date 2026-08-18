@@ -82,8 +82,13 @@ class MissavProvider : HikariProvider {
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         val page = getCached("$BASE/${media.id}") ?: return media
-        val title = metaProperty(page, "og:title")?.let { unescapeEntities(it) } ?: media.title
-        val poster = metaProperty(page, "og:image")
+        // og:title on a real video page is the full video title; on a dead/
+        // removed video MissAV serves the generic site title instead.
+        val ogTitle = metaProperty(page, "og:title")?.let { unescapeEntities(it) }
+        val title = ogTitle?.takeIf { !it.startsWith("MissAV") } ?: media.title
+        // og:image on real video pages is the LANDSCAPE cover (cover-n.jpg);
+        // the poster/thumbnail (cover-t.jpg) stays as-is.
+        val backdrop = metaProperty(page, "og:image")?.takeIf { it.startsWith("$CDN/") }
         val actor = metaProperty(page, "og:video:actor")
         val durationSec = metaProperty(page, "og:video:duration")?.toIntOrNull()
         val release = metaProperty(page, "og:video:release_date")
@@ -101,9 +106,10 @@ class MissavProvider : HikariProvider {
         }.trim()
         return media.copy(
             title = title,
-            posterUrl = poster?.ifBlank { null } ?: media.posterUrl,
+            posterUrl = media.posterUrl,
             year = year ?: media.year,
             overview = overview.ifBlank { null },
+            backdropUrl = backdrop ?: media.backdropUrl,
         )
     }
 
