@@ -10,6 +10,21 @@ Hikari APK, so they are tiny, load with the app's hardened networking
 
 ## Installing
 
+### Easiest: add this repo in the app
+
+In Hikari (v0.3.21+): **Extensions → Add Hikari repo** and paste:
+
+```
+https://raw.githubusercontent.com/codegeasse1/hikari-extensions/main/repo.json
+```
+
+The repo (**Hikari Extensions**) then appears in the *Extension repos* list —
+tap it to see every extension it contains, and **Install / Uninstall** each one
+from there. The repo JSON is also published on every build to the continuous
+release, so the list always reflects the latest `.hiki` files.
+
+### Or install a single extension by URL
+
 In Hikari (v0.3.19+): **Extensions → Install .hiki from URL** and paste:
 
 ```
