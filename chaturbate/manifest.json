@@ -1,0 +1,5 @@
+{
+  "name": "Chaturbate (Hikari)",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.ChaturbateProvider"
+}

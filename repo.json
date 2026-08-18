@@ -1,0 +1,14 @@
+{
+  "name": "Hikari Extensions",
+  "description": "Official .hiki extensions for Hikari.",
+  "plugins": [
+    {
+      "name": "Chaturbate (Hikari)",
+      "description": "Live cam rooms — public broadcasts in the built-in player.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.hiki",
+      "iconUrl": "",
+      "version": 1,
+      "tvTypes": ["movie"]
+    }
+  ]
+}
