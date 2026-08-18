@@ -7,6 +7,8 @@ import com.hikari.ext.HikariMediaType
 import com.hikari.ext.HikariNet
 import com.hikari.ext.HikariProvider
 import com.hikari.ext.HikariStream
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
@@ -50,12 +52,14 @@ class ChaturbateProvider : HikariProvider {
         private const val PAGE_SIZE = 60
 
         private val ASIAN_COUNTRIES = setOf("KR", "CN", "JP", "HK", "TW", "TH", "VN", "PH", "SG", "MY", "ID")
+        private val SUBJECT_ASIAN = listOf("korean", "chinese", "japanese", "asian", "thai", "filipino", "vietnamese")
     }
 
     // Shared live-room pool, refreshed every CACHE_TTL_MS. All catalog rows and
     // search draw from it, so a home refresh costs one pool build, not one per row.
     private var pool: List<PoolRoom> = emptyList()
     private var poolFetchedAt: Long = 0
+    private val poolMutex = Mutex()
 
     override fun catalogs(): List<HikariCatalog> = listOf(
         HikariCatalog("live", "Live Rooms", HikariMediaType.MOVIE),
@@ -85,7 +89,7 @@ class ChaturbateProvider : HikariProvider {
         return list.subList(start, minOf(start + PAGE_SIZE, list.size))
     }
 
-    private fun filtered(catId: String): List<HikariMedia> {
+    private suspend fun filtered(catId: String): List<HikariMedia> {
         val rooms = poolRooms()
         if (catId == "live") return rooms.map { it.media }
         val out = mutableListOf<HikariMedia>()
@@ -134,43 +138,46 @@ class ChaturbateProvider : HikariProvider {
     //  Pool fetching (shared, TTL-cached)
     // ------------------------------------------------------------------
 
-    @Synchronized
     private suspend fun poolRooms(): List<PoolRoom> {
         val now = System.currentTimeMillis()
         if (pool.isNotEmpty() && now - poolFetchedAt < CACHE_TTL_MS) return pool
-        val fresh = mutableListOf<PoolRoom>()
-        val seen = HashSet<String>()
-        for (page in 0 until POOL_PAGES) {
-            val json = runCatching {
-                HikariNet.getJson(
-                    "https://chaturbate.com/api/ts/roomlist/room-list/?limit=$POOL_PAGE_SIZE&offset=${page * POOL_PAGE_SIZE}"
-                )
-            }.getOrNull() ?: break
-            val arr = json.optJSONArray("rooms") ?: break
-            var any = false
-            for (i in 0 until arr.length()) {
-                val r = arr.optJSONObject(i) ?: continue
-                val media = roomToMedia(r) ?: continue
-                if (!seen.add(media.id)) continue
-                fresh += PoolRoom(
-                    media = media,
-                    gender = r.optString("gender"),
-                    subject = r.optString("room_subject").lowercase(),
-                    tags = r.optJSONArray("tags")?.let { a ->
-                        (0 until a.length()).mapNotNull { a.optString(it).ifBlank { null } }.toSet()
-                    } ?: emptySet(),
-                    country = r.optString("country").uppercase(),
-                    isNew = r.optBoolean("is_new", false),
-                )
-                any = true
+        return poolMutex.withLock {
+            val now2 = System.currentTimeMillis()
+            if (pool.isNotEmpty() && now2 - poolFetchedAt < CACHE_TTL_MS) return@withLock pool
+            val fresh = mutableListOf<PoolRoom>()
+            val seen = HashSet<String>()
+            for (page in 0 until POOL_PAGES) {
+                val json = runCatching {
+                    HikariNet.getJson(
+                        "https://chaturbate.com/api/ts/roomlist/room-list/?limit=$POOL_PAGE_SIZE&offset=${page * POOL_PAGE_SIZE}"
+                    )
+                }.getOrNull() ?: break
+                val arr = json.optJSONArray("rooms") ?: break
+                var any = false
+                for (i in 0 until arr.length()) {
+                    val r = arr.optJSONObject(i) ?: continue
+                    val media = roomToMedia(r) ?: continue
+                    if (!seen.add(media.id)) continue
+                    fresh += PoolRoom(
+                        media = media,
+                        gender = r.optString("gender"),
+                        subject = r.optString("room_subject").lowercase(),
+                        tags = r.optJSONArray("tags")?.let { a ->
+                            (0 until a.length()).mapNotNull { a.optString(it).ifBlank { null } }.toSet()
+                        } ?: emptySet(),
+                        country = r.optString("country").uppercase(),
+                        isNew = r.optBoolean("is_new", false),
+                    )
+                    any = true
+                }
+                if (!any) break
             }
-            if (!any) break
+            if (fresh.isNotEmpty()) {
+                pool = fresh
+                poolFetchedAt = now2
+            }
+            pool
         }
-        if (fresh.isNotEmpty()) {
-            pool = fresh
-            poolFetchedAt = now
-        }
-        return pool
     }
 
     private fun roomToMedia(r: JSONObject): HikariMedia? {
@@ -272,7 +279,4 @@ class ChaturbateProvider : HikariProvider {
     private fun stripHtml(s: String): String =
         s.replace(Regex("""<[^>]+>"""), "").replace(Regex("""\s+"""), " ").trim()
 
-    private companion object {
-        val SUBJECT_ASIAN = listOf("korean", "chinese", "japanese", "asian", "thai", "filipino", "vietnamese")
-    }
 }
