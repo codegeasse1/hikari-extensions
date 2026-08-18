@@ -18,41 +18,159 @@ import org.json.JSONObject
  *    `window.initialRoomDossier` object whose `hls_source` is a signed LL-HLS
  *    playlist for the live broadcast.
  *
- * The room-list API ignores search/filter params, so search scans a few pages
- * of the live list and matches locally (username, subject, tags).
+ * The room-list API ignores every filter param for anonymous clients (gender,
+ * tag, search are all ignored — verified), so the provider fetches a large
+ * pool of live rooms (8 pages × 100, cached ~90s and shared by every catalog
+ * row and search) and buckets them into category rows client-side: gender
+ * (Women/Couples/Men/Trans), tags (Teen, Big Boobs, Latina, Mature, Goth,
+ * Curvy, Ebony, New) and Asian via tag + subject + country.
  */
 class ChaturbateProvider : HikariProvider {
 
     override val id = "chaturbate"
     override val name = "Chaturbate (Hikari)"
     override val mainUrl = "https://chaturbate.com"
-    override val description = "Live cam rooms — public broadcasts play in the built-in player."
+    override val description = "Live cam rooms — public broadcasts in the built-in player."
     override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
-    override fun catalogs() = listOf(
+    private data class PoolRoom(
+        val media: HikariMedia,
+        val gender: String,
+        val subject: String,
+        val tags: Set<String>,
+        val country: String,
+        val isNew: Boolean,
+    )
+
+    companion object {
+        private const val POOL_PAGES = 8
+        private const val POOL_PAGE_SIZE = 100
+        private const val CACHE_TTL_MS = 90_000L
+        private const val PAGE_SIZE = 60
+
+        private val ASIAN_COUNTRIES = setOf("KR", "CN", "JP", "HK", "TW", "TH", "VN", "PH", "SG", "MY", "ID")
+    }
+
+    // Shared live-room pool, refreshed every CACHE_TTL_MS. All catalog rows and
+    // search draw from it, so a home refresh costs one pool build, not one per row.
+    private var pool: List<PoolRoom> = emptyList()
+    private var poolFetchedAt: Long = 0
+
+    override fun catalogs(): List<HikariCatalog> = listOf(
         HikariCatalog("live", "Live Rooms", HikariMediaType.MOVIE),
+        HikariCatalog("women", "Women", HikariMediaType.MOVIE),
+        HikariCatalog("couples", "Couples", HikariMediaType.MOVIE),
+        HikariCatalog("men", "Men", HikariMediaType.MOVIE),
+        HikariCatalog("trans", "Trans", HikariMediaType.MOVIE),
+        HikariCatalog("teen", "Teen", HikariMediaType.MOVIE),
+        HikariCatalog("bigboobs", "Big Boobs", HikariMediaType.MOVIE),
+        HikariCatalog("asian", "Asian", HikariMediaType.MOVIE),
+        HikariCatalog("latina", "Latina", HikariMediaType.MOVIE),
+        HikariCatalog("mature", "Mature & Milf", HikariMediaType.MOVIE),
+        HikariCatalog("goth", "Goth & Alt", HikariMediaType.MOVIE),
+        HikariCatalog("curvy", "Curvy & Thick", HikariMediaType.MOVIE),
+        HikariCatalog("ebony", "Ebony", HikariMediaType.MOVIE),
+        HikariCatalog("new", "New Models", HikariMediaType.MOVIE),
     )
 
     // ------------------------------------------------------------------
-    //  Room list
+    //  Catalog / search over the shared pool
     // ------------------------------------------------------------------
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
-        if (catalog.id != "live") return emptyList()
-        return rooms(24, (page - 1) * 24)
+        val list = filtered(catalog.id)
+        val start = (page - 1) * PAGE_SIZE
+        if (list.isEmpty() || start >= list.size) return emptyList()
+        return list.subList(start, minOf(start + PAGE_SIZE, list.size))
     }
 
-    private suspend fun rooms(limit: Int, offset: Int): List<HikariMedia> {
-        val json = HikariNet.getJson(
-            "https://chaturbate.com/api/ts/roomlist/room-list/?limit=$limit&offset=$offset"
-        ) ?: return emptyList()
-        val arr = json.optJSONArray("rooms") ?: return emptyList()
+    private fun filtered(catId: String): List<HikariMedia> {
+        val rooms = poolRooms()
+        if (catId == "live") return rooms.map { it.media }
         val out = mutableListOf<HikariMedia>()
-        for (i in 0 until arr.length()) {
-            roomToMedia(arr.optJSONObject(i))?.let { out += it }
+        for (r in rooms) {
+            if (inCategory(r, catId)) out += r.media
         }
         return out
+    }
+
+    private fun inCategory(r: PoolRoom, catId: String): Boolean = when (catId) {
+        "women" -> r.gender == "f"
+        "couples" -> r.gender == "c"
+        "men" -> r.gender == "m"
+        "trans" -> r.gender == "s"
+        "teen" -> r.tags.contains("teen")
+        "bigboobs" -> r.tags.any { it == "bigboobs" || it == "bigtits" || it == "hugeboobs" }
+        "asian" -> r.tags.contains("asian") ||
+            SUBJECT_ASIAN.any { r.subject.contains(it) } ||
+            r.country in ASIAN_COUNTRIES
+        "latina" -> r.tags.contains("latina") || r.subject.contains("latina") || r.subject.contains("hispanic")
+        "mature" -> r.tags.any { it == "mature" || it == "milf" || it == "cougar" } ||
+            r.subject.contains("milf") || r.subject.contains("mature")
+        "goth" -> r.tags.any { it == "goth" || it == "alt" || it == "emo" } ||
+            r.subject.contains("goth") || r.subject.contains("gothic")
+        "curvy" -> r.tags.any { it == "curvy" || it == "thick" || it == "bbw" }
+        "ebony" -> r.tags.contains("ebony") || r.subject.contains("ebony") || r.subject.contains("black")
+        "new" -> r.isNew || r.tags.contains("new")
+        else -> false
+    }
+
+    override suspend fun search(query: String, page: Int): List<HikariMedia> {
+        val q = query.trim().lowercase()
+        if (q.isBlank()) return emptyList()
+        val out = LinkedHashMap<String, HikariMedia>()
+        for (r in poolRooms()) {
+            if (r.media.id.contains(q) || r.media.title.contains(q) ||
+                r.subject.contains(q) || r.tags.any { it.contains(q) }
+            ) {
+                out[r.media.id] = r.media
+            }
+        }
+        return out.values.take(PAGE_SIZE * 2)
+    }
+
+    // ------------------------------------------------------------------
+    //  Pool fetching (shared, TTL-cached)
+    // ------------------------------------------------------------------
+
+    @Synchronized
+    private suspend fun poolRooms(): List<PoolRoom> {
+        val now = System.currentTimeMillis()
+        if (pool.isNotEmpty() && now - poolFetchedAt < CACHE_TTL_MS) return pool
+        val fresh = mutableListOf<PoolRoom>()
+        val seen = HashSet<String>()
+        for (page in 0 until POOL_PAGES) {
+            val json = runCatching {
+                HikariNet.getJson(
+                    "https://chaturbate.com/api/ts/roomlist/room-list/?limit=$POOL_PAGE_SIZE&offset=${page * POOL_PAGE_SIZE}"
+                )
+            }.getOrNull() ?: break
+            val arr = json.optJSONArray("rooms") ?: break
+            var any = false
+            for (i in 0 until arr.length()) {
+                val r = arr.optJSONObject(i) ?: continue
+                val media = roomToMedia(r) ?: continue
+                if (!seen.add(media.id)) continue
+                fresh += PoolRoom(
+                    media = media,
+                    gender = r.optString("gender"),
+                    subject = r.optString("room_subject").lowercase(),
+                    tags = r.optJSONArray("tags")?.let { a ->
+                        (0 until a.length()).mapNotNull { a.optString(it).ifBlank { null } }.toSet()
+                    } ?: emptySet(),
+                    country = r.optString("country").uppercase(),
+                    isNew = r.optBoolean("is_new", false),
+                )
+                any = true
+            }
+            if (!any) break
+        }
+        if (fresh.isNotEmpty()) {
+            pool = fresh
+            poolFetchedAt = now
+        }
+        return pool
     }
 
     private fun roomToMedia(r: JSONObject): HikariMedia? {
@@ -90,31 +208,6 @@ class ChaturbateProvider : HikariProvider {
     }
 
     // ------------------------------------------------------------------
-    //  Search (local filter — the API ignores search params)
-    // ------------------------------------------------------------------
-
-    override suspend fun search(query: String, page: Int): List<HikariMedia> {
-        val q = query.trim().lowercase()
-        if (q.isBlank()) return emptyList()
-        val seen = LinkedHashMap<String, HikariMedia>()
-        for (offset in intArrayOf(0, 48, 96)) {
-            val list = rooms(48, offset)
-            if (list.isEmpty()) break
-            for (m in list) {
-                if (matches(m, q)) seen[m.id] = m
-            }
-        }
-        return seen.values.take(48)
-    }
-
-    private fun matches(m: HikariMedia, q: String): Boolean {
-        if (m.id.contains(q, ignoreCase = true)) return true
-        if (m.title.contains(q, ignoreCase = true)) return true
-        if ((m.overview ?: "").contains(q, ignoreCase = true)) return true
-        return m.genres.any { it.contains(q, ignoreCase = true) }
-    }
-
-    // ------------------------------------------------------------------
     //  Meta + streams (from the room page's embedded dossier)
     // ------------------------------------------------------------------
 
@@ -123,21 +216,13 @@ class ChaturbateProvider : HikariProvider {
         val dec = decodeDossierQuotes(page)
         val status = fieldOf(dec, "room_status")
         val viewers = fieldOf(dec, "num_viewers")
-        val title = fieldOf(dec, "room_title")
         val overview = buildString {
             if (status == "public") append("Live now")
             else append("Room currently ${status ?: "offline"}")
             viewers?.let { append(" · ").append(it).append(" viewers") }
-            if (media.overview.isNullOrBlank()) {
-                title?.takeIf { it.isNotBlank() }?.let { append("\n").append(it) }
-            } else {
-                append("\n").append(media.overview)
-            }
+            if (!media.overview.isNullOrBlank()) append("\n").append(media.overview)
         }.trim()
-        return media.copy(
-            overview = overview.ifBlank { media.overview },
-            backdropUrl = media.posterUrl,
-        )
+        return media.copy(overview = overview.ifBlank { media.overview })
     }
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
@@ -186,4 +271,8 @@ class ChaturbateProvider : HikariProvider {
 
     private fun stripHtml(s: String): String =
         s.replace(Regex("""<[^>]+>"""), "").replace(Regex("""\s+"""), " ").trim()
+
+    private companion object {
+        val SUBJECT_ASIAN = listOf("korean", "chinese", "japanese", "asian", "thai", "filipino", "vietnamese")
+    }
 }
