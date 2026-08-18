@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Local build of all extensions in this repo → *.hiki
-# Needs: java 17+, jar (JDK), and a downloaded deps/ set (or run the workflow).
+# Builds an extension (default: chaturbate) → <name>.hiki
+# Needs: java 17+, jar (JDK), curl, unzip. Downloads kotlinc + deps on first run.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 KOTLINC_DIR="${KOTLINC_DIR:-./kotlinc}"
 DEPS="deps"
+EXT_NAME="${EXT_NAME:-chaturbate}"
 mkdir -p "$DEPS"
 
 fetch() {
@@ -30,27 +31,23 @@ rm -rf build
 mkdir -p build/sdk-out build/ext-out build/dex-out build/pkg
 
 # 1) compile the SDK (interface + net helpers) against stubs → sdk.jar
-"$KOTLINC_DIR/bin/kotlinc" -nowarn -cp "$CP" -d build/sdk-out sdk/HikariProvider.kt sdk/HikariNet.kt stubs/*.kt
+"$KOTLINC_DIR/bin/kotlinc" -cp "$CP" -d build/sdk-out \
+  sdk/HikariProvider.kt sdk/HikariNet.kt stubs/HttpStub.kt stubs/WebViewResolverStub.kt
 jar cf build/sdk.jar -C build/sdk-out .
 
-# 2) compile every extension against sdk.jar → one jar per folder
-for ext in */manifest.json; do
-  dir=$(dirname "$ext")
-  [ "$dir" = "chaturbate" ] || continue   # only known extensions here
-  name=$(basename "$dir")
-  rm -rf build/ext-out
-  "$KOTLINC_DIR/bin/kotlinc" -nowarn -cp "build/sdk.jar:deps/android-4.1.1.4.jar" -d build/ext-out "$dir"/src/**/*.kt
-  jar cf "build/$name.jar" -C build/ext-out .
-  # 3) dex
-  rm -rf build/dex-out
-  java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
-    --lib deps/android-4.1.1.4.jar --classpath build/sdk.jar \
-    --output build/dex-out "build/$name.jar"
-  # 4) package .hiki = classes.dex + manifest.json
-  rm -rf build/pkg
-  mkdir -p build/pkg
-  cp build/dex-out/classes.dex build/pkg/
-  cp "$dir/manifest.json" build/pkg/
-  jar cf "$name.hiki" -C build/pkg .
-  echo "built $name.hiki"
-done
+# 2) compile the extension against sdk.jar
+"$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:deps/android-4.1.1.4.jar" -d build/ext-out \
+  "$EXT_NAME"/src/com/hikari/ext/providers/*.kt
+jar cf "build/$EXT_NAME.jar" -C build/ext-out .
+
+# 3) dex the extension (SDK classes stay as external references)
+java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
+  --lib deps/android-4.1.1.4.jar --classpath build/sdk.jar \
+  --output build/dex-out "build/$EXT_NAME.jar"
+
+# 4) package .hiki = classes.dex + manifest.json
+cp build/dex-out/classes.dex build/pkg/
+cp "$EXT_NAME/manifest.json" build/pkg/
+jar cf "$EXT_NAME.hiki" -C build/pkg .
+
+echo "built $EXT_NAME.hiki"

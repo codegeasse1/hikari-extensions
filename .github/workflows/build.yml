@@ -25,50 +25,32 @@ jobs:
           path: kotlinc
           key: kotlinc-2.1.20
 
-      - name: Install kotlinc
+      - name: Build
         run: |
-          if [ ! -d kotlinc ]; then
-            curl -fsSL -o kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
-            unzip -q kotlinc.zip
+          set -o pipefail
+          bash build.sh > build.log 2>&1
+          code=$?
+          echo "build exit code = $code"
+          if [ $code -ne 0 ]; then
+            echo "==== TAIL OF BUILD LOG ===="
+            tail -n 150 build.log
+            echo "==== KOTLIN ERRORS ===="
+            grep -E "^e: " build.log | head -n 40 || true
+            echo "==== KOTLINC/GRADLE ERRORS ===="
+            grep -E "error:|exception|FAILURE" build.log | head -n 40 || true
           fi
+          exit $code
 
-      - name: Download build deps
-        run: |
-          mkdir -p deps
-          cd deps
-          [ -f android-4.1.1.4.jar ] || curl -fsSL -o android-4.1.1.4.jar https://repo1.maven.org/maven2/com/google/android/android/4.1.1.4/android-4.1.1.4.jar
-          [ -f kotlinx-coroutines-core-jvm-1.9.0.jar ] || curl -fsSL -o kotlinx-coroutines-core-jvm-1.9.0.jar https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.9.0/kotlinx-coroutines-core-jvm-1.9.0.jar
-          [ -f okhttp-4.12.0.jar ] || curl -fsSL -o okhttp-4.12.0.jar https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0.jar
-          [ -f okio-jvm-3.6.0.jar ] || curl -fsSL -o okio-jvm-3.6.0.jar https://repo1.maven.org/maven2/com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0.jar
-          [ -f r8-8.3.37.jar ] || curl -fsSL -o r8-8.3.37.jar https://dl.google.com/dl/android/maven2/com/android/tools/r8/8.3.37/r8-8.3.37.jar
-
-      - name: Compile SDK
-        run: |
-          mkdir -p sdk-out
-          ./kotlinc/bin/kotlinc -nowarn \
-            -cp "deps/android-4.1.1.4.jar:deps/kotlinx-coroutines-core-jvm-1.9.0.jar:deps/okhttp-4.12.0.jar:deps/okio-jvm-3.6.0.jar" \
-            -d sdk-out sdk/HikariProvider.kt sdk/HikariNet.kt stubs/HttpStub.kt stubs/WebViewResolverStub.kt
-          jar cf sdk.jar -C sdk-out .
-
-      - name: Compile extensions
-        run: |
-          mkdir -p ext-out
-          ./kotlinc/bin/kotlinc -nowarn -cp "sdk.jar:deps/android-4.1.1.4.jar" \
-            -d ext-out chaturbate/src/com/hikari/ext/providers/ChaturbateProvider.kt
-          jar cf chaturbate.jar -C ext-out .
-
-      - name: Dex and package .hiki
-        run: |
-          mkdir -p dex-out pkg
-          java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
-            --lib deps/android-4.1.1.4.jar \
-            --classpath sdk.jar \
-            --output dex-out chaturbate.jar
-          cp dex-out/classes.dex pkg/
-          cp chaturbate/manifest.json pkg/
-          jar cf chaturbate.hiki -C pkg .
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
 
       - name: Upload artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: hiki
@@ -76,6 +58,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish to continuous release
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
