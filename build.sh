@@ -36,8 +36,10 @@ mkdir -p build/sdk-out build/ext-out build/dex-out build/pkg
   sdk/HikariProvider.kt sdk/HikariNet.kt stubs/HttpStub.kt stubs/WebViewResolverStub.kt
 jar cf build/sdk.jar -C build/sdk-out .
 
-# 2) compile the extension against sdk.jar
-"$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:deps/json-20231013.jar" -d build/ext-out \
+# 2) compile the extension against sdk.jar (coroutines on classpath so
+#    suspend helpers + kotlinx.coroutines.sync.Mutex resolve; at runtime the
+#    app's classloader provides kotlinx-coroutines)
+"$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:deps/json-20231013.jar:deps/kotlinx-coroutines-core-jvm-1.9.0.jar" -d build/ext-out \
   "$EXT_NAME"/src/com/hikari/ext/providers/*.kt
 jar cf "build/$EXT_NAME.jar" -C build/ext-out .
 
@@ -46,6 +48,7 @@ java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
   --lib deps/android-4.1.1.4.jar \
   --classpath build/sdk.jar \
   --classpath deps/json-20231013.jar \
+  --classpath deps/kotlinx-coroutines-core-jvm-1.9.0.jar \
   --output build/dex-out "build/$EXT_NAME.jar"
 
 # 4) package .hiki = classes.dex + manifest.json
