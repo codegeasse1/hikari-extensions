@@ -95,6 +95,31 @@ class Hanime1Provider : HikariProvider {
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val watchUrl = "$BASE/watch?v=${media.id}"
+
+        // The watch page serves every MP4 quality in plain <source> tags
+        // (vdownload.hembed.com signed URLs) — no WebView/JS needed. Parsing
+        // them directly is far more reliable than hoping the page's player
+        // autoplays inside a capture WebView.
+        val page = HikariNet.getStringSmart(watchUrl) ?: return emptyList()
+        val re = Regex(
+            """<source\s+src="(https://vdownload\.hembed\.com/[^"]+\.mp4[^"]*)"\s+type="video/mp4"\s+size="(\d+)""""
+        )
+        val sources = re.findAll(page).mapNotNull { m ->
+            val size = m.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+            size to m.groupValues[1]
+        }.toList()
+        if (sources.isNotEmpty()) {
+            val headers = HikariNet.browserHeaders + mapOf("Referer" to "$BASE/")
+            return sources.sortedByDescending { it.first }.map { (size, url) ->
+                HikariStream(
+                    name = "MP4 ${size}p",
+                    url = url,
+                    headers = headers,
+                )
+            }
+        }
+
+        // Fallback: the player page approach (older video pages may differ).
         val captured = HikariNet.resolveWithWebView(
             watchUrl,
             capture = Regex("""https://[^\s"'\\<>]+\.m3u8(\?[^\s"'\\<>]*)?"""),

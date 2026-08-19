@@ -58,7 +58,9 @@ class WatchhentaiProvider : HikariProvider {
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
         val url = when (catalog.id) {
             "series" -> pageUrl("$BASE/tvshows/", page)
-            "episodes" -> pageUrl("$BASE/episodes/", page)
+            // /videos/ is the episodes listing (the /episodes/ slug has been
+            // intermittently serving 404 while /videos/ is the same page).
+            "episodes" -> pageUrl("$BASE/videos/", page)
             "trending" -> if (page <= 1) "$BASE/trending/" else null
             else -> pageUrl("$BASE/genre/${catalog.id}/", page)
         } ?: return emptyList()
@@ -176,13 +178,17 @@ class WatchhentaiProvider : HikariProvider {
         )
         val out = LinkedHashMap<String, Ep>()
         for (m in re.findAll(html)) {
-            val slug = m.groupValues[1]
+            // group 1 = the poster's data-src (image URL), group 2 = the video
+            // page slug — they were swapped before, so every episode's id was
+            // the IMAGE URL and the video page fetch 404'd ("no playable
+            // source").
+            val slug = m.groupValues[2]
             if (out.containsKey(slug)) continue
             out[slug] = Ep(
                 slug = slug,
                 serie = unescape(m.groupValues[3]),
                 number = m.groupValues[4].toIntOrNull() ?: 1,
-                poster = m.groupValues[2].takeIf { it.startsWith("http") },
+                poster = m.groupValues[1].takeIf { it.startsWith("http") },
             )
         }
         return out.values.toList()
