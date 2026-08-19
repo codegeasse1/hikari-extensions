@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.withLock
  *  - the homepage server-renders four video rows (Recent Uploads, New
  *    Releases, Trending, Random) with full card grids — those are the
  *    catalogs,
- *  - `/browse/*` and search are client-side (the guest API behind them is
+ *  - `/browse/` and search are client-side (the guest API behind them is
  *    Cloudflare-blocked), so those aren't scrapable server-side — search is
  *    intentionally not wired up,
  *  - the video page's player (HTVPlayer) is client-side too, so streams are
@@ -68,7 +68,7 @@ class HanimetvProvider : HikariProvider {
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         val page = getCached("$BASE/videos/hentai/${media.id}") ?: return media
         val backdrop = metaProperty(page, "og:image")?.takeIf { it.startsWith("https://hanime-cdn.com/") }
-        val duration = Regex(""""duration":"PT(\d+)M(\d+)S"""").find(page)
+        val duration = Regex("\"duration\":\"PT(\\d+)M(\\d+)S\"").find(page)
         val runtime = duration?.let { m ->
             val mins = m.groupValues[1].toIntOrNull() ?: 0
             val secs = m.groupValues[2].toIntOrNull() ?: 0

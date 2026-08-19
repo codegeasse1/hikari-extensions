@@ -81,7 +81,7 @@ class HstreamProvider : HikariProvider {
             ?.mapNotNull { unescape(it).trim().trim('"').ifBlank { null } }
             ?: emptyList()
         val views = Regex(""""userInteractionCount":(\d+)""").find(page)?.groupValues?.get(1)
-        val uploadDate = Regex(""""uploadDate":"(\d{4})""").find(page)?.groupValues?.get(1)
+        val uploadDate = Regex("\"uploadDate\":\"(\\d{4})\"").find(page)?.groupValues?.get(1)
         val overview = buildString {
             if (genres.isNotEmpty()) append(genres.joinToString(", "))
             val bits = mutableListOf<String>()
