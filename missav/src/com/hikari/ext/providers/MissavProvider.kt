@@ -38,7 +38,7 @@ class MissavProvider : HikariProvider {
     override val mainUrl = "https://missav.ws"
     override val description = "Free JAV — new releases, hot today, uncensored leaks and 100k+ genre videos."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
-    override val version = 1
+    override val version = 3
 
     companion object {
         private const val BASE = "https://missav.ws/en"
@@ -118,17 +118,30 @@ class MissavProvider : HikariProvider {
 
         // Primary: real WebView load — the site's own hls.js requests the CDN
         // manifest, passes the Cloudflare challenge, and we capture the request
-        // URL + headers (including the cookie) for the player.
+        // URL + headers (including the cookie) for the player. The CDN
+        // (surrit.com) answers plain clients with a Cloudflare 403 challenge,
+        // so ONLY the captured request (which carries the session cookie) can
+        // actually play — the packed-blob URL below is a last resort for when
+        // a plain fetch gets through. Timeout stays under the app's 45s
+        // per-provider stream budget so the fallback still gets a chance.
         val captured = HikariNet.resolveWithWebView(
             pageUrl,
-            capture = Regex("https://surrit\\.com/[^\"'\\s]+\\.m3u8(\\?[^\"'\\s]*)?")
+            capture = Regex("https://surrit\\.com/[^\"'\\s]+\\.m3u8(\\?[^\"'\\s]*)?", RegexOption.IGNORE_CASE),
+            additional = listOf(
+                Regex("https://[^\"'\\s]+\\.m3u8(\\?[^\"'\\s]*)?", RegexOption.IGNORE_CASE),
+                Regex("https://[^\"'\\s]+/master\\.m3u8(\\?[^\"'\\s]*)?", RegexOption.IGNORE_CASE),
+            ),
+            timeoutMs = 40_000,
         )
-        captured.firstOrNull()?.let { hit ->
+        // Prefer the site's own manifest, then any other m3u8 the player fired.
+        val hit = captured.firstOrNull { it.url.contains("surrit.com", ignoreCase = true) }
+            ?: captured.firstOrNull { it.url.contains(".m3u8", ignoreCase = true) }
+        hit?.let {
             return listOf(
                 HikariStream(
                     name = "HLS",
-                    url = hit.url,
-                    headers = hit.headers,
+                    url = it.url,
+                    headers = it.headers,
                     isM3u8 = true,
                 )
             )

@@ -52,7 +52,7 @@
       "name": "MissAV (JAV)",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
-      "version": 2,
+      "version": 3,
       "tvTypes": [
         "movie"
       ]
