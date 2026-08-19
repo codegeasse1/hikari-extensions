@@ -97,7 +97,7 @@ class HanimetvProvider : HikariProvider {
             append("""(function(){
   if (window.__htvExfil) return; window.__htvExfil = 1;
   var SLUG = """)
-            append(JSON.stringify(slug))
+            append("\"" + slug.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
             append(""";
   var SECRET = "htv-insecure-handshake-v1";
   var EXTRA = "htv-insecure-v1";
