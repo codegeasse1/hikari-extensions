@@ -28,7 +28,7 @@ class HanimetvProvider : HikariProvider {
     override val id = "hanimetv"
     override val name = "HanimeTV"
     override val mainUrl = "https://hanime.tv"
-    override val version = 7
+    override val version = 8
     override val description = "Curated 720p/1080p hentai — new releases, trending and random."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
@@ -156,17 +156,19 @@ class HanimetvProvider : HikariProvider {
                 // The handshake sometimes returns relative paths (`/hls/…`);
                 // resolve them against the site like the web player does.
                 val resolved = if (realUrl.startsWith("/")) "$BASE$realUrl" else realUrl
+                val isHls = isHlsUrl(resolved)
+                val isMpd = resolved.contains(".mpd")
                 HikariStream(
-                    name = if (resolved.contains(".m3u8")) "HLS" else if (resolved.contains(".mpd")) "DASH" else "MP4",
+                    name = if (isHls) "HLS" else if (isMpd) "DASH" else "MP4",
                     url = resolved,
                     headers = hit.headers + mapOf("Referer" to "$BASE/"),
-                    isM3u8 = resolved.contains(".m3u8"),
-                    isMpd = resolved.contains(".mpd"),
+                    isM3u8 = isHls,
+                    isMpd = isMpd,
                 )
             }.distinctBy { it.url }
         }
         captured.firstOrNull { !it.url.startsWith("https://m.capture/") }?.let { hit ->
-            val isHls = hit.url.contains(".m3u8")
+            val isHls = isHlsUrl(hit.url)
             val isMpd = hit.url.contains(".mpd")
             return listOf(
                 HikariStream(
@@ -255,6 +257,13 @@ class HanimetvProvider : HikariProvider {
     private fun metaProperty(html: String, prop: String): String? =
         Regex("""<meta\s+property="[^"]*$prop[^"]*"\s+content="([^"]*)"""")
             .find(html)?.groupValues?.get(1)
+
+    /** True when [url] points at an HLS stream: an explicit .m3u8, the site's
+     *  `/hls/<id>/<token>` manifest path, or the legacy hls.hanime.tv host. */
+    private fun isHlsUrl(url: String): Boolean =
+        url.contains(".m3u8", ignoreCase = true) ||
+            url.contains("/hls/", ignoreCase = true) ||
+            url.contains("hls.hanime.tv", ignoreCase = true)
 
     private fun unescape(s: String): String = s
         .replace("&amp;", "&")

@@ -34,7 +34,7 @@
       "name": "HanimeTV",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.hiki",
-      "version": 7,
+      "version": 8,
       "tvTypes": [
         "movie"
       ]
