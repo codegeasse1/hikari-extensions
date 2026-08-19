@@ -28,7 +28,7 @@ class HanimetvProvider : HikariProvider {
     override val id = "hanimetv"
     override val name = "HanimeTV"
     override val mainUrl = "https://hanime.tv"
-    override val version = 6
+    override val version = 7
     override val description = "Curated 720p/1080p hentai — new releases, trending and random."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
@@ -126,7 +126,7 @@ class HanimetvProvider : HikariProvider {
           return decrypt(xt);
         }).then(function(plain){
           if(!plain) return;
-          try{ var d=JSON.parse(plain); (d.sources||[]).forEach(function(s){ if(s){ var u=(s&&(s.src||s.url))||""; if(u) exfil(u); } }); }catch(e){}
+          try{ var d=JSON.parse(plain); (d.sources||[]).forEach(function(s){ if(s){ var u=(s&&(s.src||s.url))||""; if(u){ u=new URL(u,location.href).href; exfil(u); } } }); }catch(e){}
         }).catch(function(){});
       });
     });
@@ -153,12 +153,15 @@ class HanimetvProvider : HikariProvider {
                 val realUrl = runCatching { java.net.URLDecoder.decode(enc, "UTF-8") }.getOrNull()
                     ?: return@mapNotNull null
                 if (realUrl.isBlank()) return@mapNotNull null
+                // The handshake sometimes returns relative paths (`/hls/…`);
+                // resolve them against the site like the web player does.
+                val resolved = if (realUrl.startsWith("/")) "$BASE$realUrl" else realUrl
                 HikariStream(
-                    name = if (realUrl.contains(".m3u8")) "HLS" else if (realUrl.contains(".mpd")) "DASH" else "MP4",
-                    url = realUrl,
+                    name = if (resolved.contains(".m3u8")) "HLS" else if (resolved.contains(".mpd")) "DASH" else "MP4",
+                    url = resolved,
                     headers = hit.headers + mapOf("Referer" to "$BASE/"),
-                    isM3u8 = realUrl.contains(".m3u8"),
-                    isMpd = realUrl.contains(".mpd"),
+                    isM3u8 = resolved.contains(".m3u8"),
+                    isMpd = resolved.contains(".mpd"),
                 )
             }.distinctBy { it.url }
         }
