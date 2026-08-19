@@ -1,5 +1,6 @@
 package com.hikari.ext.providers
 
+import com.hikari.ext.HikariCatalog
 import com.hikari.ext.HikariEpisode
 import com.hikari.ext.HikariMedia
 import com.hikari.ext.HikariMediaType
@@ -50,6 +51,24 @@ class CastleProvider : HikariProvider {
         private const val APK_SIGN_KEY = "ED0955EB04E67A1D9F3305B95454FED485261475"
         private const val PEPPER = "T!BgJB"
         private const val CASTLE_UA = "okhttp/4.9.3"
+
+        /** Live home carousels from /category/home (verified against the API).
+         *  "Hot Erotic Series" and "Bollywood Star" are skipped — the plugin
+         *  skips them too (the latter is celebrity filler, not watchable media). */
+        private val CATALOG_ROWS = listOf(
+            "Watch Popular Movies",
+            "Popular WebSeries",
+            "Most Watching Trending Now",
+            "Upcoming",
+            "Hottest International Film 🔥",
+            "Recommended for You ",
+            "Most Romantic Movie&Series",
+            "Bollywood Movie",
+            "Reality Shows",
+            "Fantasy and Adventure",
+            "Marvel Universe",
+            "Horror, Supernatural & Thriller",
+        )
     }
 
     private val headers = HikariNet.browserHeaders + mapOf(
@@ -187,6 +206,55 @@ class CastleProvider : HikariProvider {
         }
         out.sortWith(compareBy({ it.season }, { it.number }))
         return out
+    }
+
+    override fun catalogs(): List<HikariCatalog> =
+        CATALOG_ROWS.map { HikariCatalog(id = it, name = it, type = HikariMediaType.SERIES) }
+
+    override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
+        val key = securityKey() ?: return emptyList()
+        val url = "$BASE/film-api/v0.1/category/home?channel=$CHANNEL&clientType=1" +
+            "&lang=en-US&locationId=1001&mode=1&packageName=$PACKAGE&page=$page&size=17"
+        val raw = HikariNet.getString(url, headers) ?: return emptyList()
+        val d = unwrap(raw, key) ?: return emptyList()
+        val rows = d.optJSONArray("rows") ?: return emptyList()
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            if (row.optString("name").trim() == catalog.id) {
+                return row.optJSONArray("contents")
+                    ?.let { arr ->
+                        (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let { c -> mediaFromContent(c) } }
+                    }
+                    ?: emptyList()
+            }
+        }
+        // Row name drift — return whatever home rows we got so the catalog
+        // still shows content instead of going blank.
+        val out = mutableListOf<HikariMedia>()
+        for (i in 0 until rows.length()) {
+            rows.optJSONObject(i)?.optJSONArray("contents")?.let { arr ->
+                for (j in 0 until arr.length()) {
+                    arr.optJSONObject(j)?.let { c -> out += mediaFromContent(c) }
+                }
+            }
+        }
+        return out
+    }
+
+    /** Content items in a home row use `redirectId`/`coverImage` (unlike search
+     *  results, which use `id`/`coverVerticalImage`). */
+    private fun mediaFromContent(row: JSONObject): HikariMedia {
+        val type = when (row.optInt("movieType", -1)) {
+            1, 3, 5 -> HikariMediaType.SERIES
+            else -> HikariMediaType.MOVIE
+        }
+        return HikariMedia(
+            id = row.optString("redirectId").ifBlank { row.optString("id") },
+            title = row.optString("title"),
+            type = type,
+            posterUrl = row.optString("coverImage").ifBlank { null },
+            backdropUrl = row.optString("coverImage").ifBlank { null },
+        )
     }
 
     /** Episode id carries `<sourceMovieId>:<episodeId>` so getStreams can pick
