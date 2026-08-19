@@ -3,52 +3,59 @@
   "description": "Official .hiki extensions for Hikari.",
   "plugins": [
     {
+      "name": "Castle TV",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/castle.hiki",
+      "version": 2,
+      "tvTypes": ["movie", "tv"]
+    },
+    {
       "name": "Chaturbate (Hikari)",
-      "description": "Live cam rooms — category rows, search, and live broadcasts in the built-in player.",
+      "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.hiki",
       "version": 2,
       "tvTypes": ["movie"]
     },
     {
-      "name": "MissAV (JAV)",
-      "description": "Free JAV — new releases, hot today, uncensored leaks and 100k+ genre videos.",
-      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
-      "version": 1,
-      "tvTypes": ["movie"]
-    },
-    {
-      "name": "Oppai Stream",
-      "description": "Hentai anime in HD & 4K — direct Blu-ray rips, many genres.",
-      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.hiki",
-      "version": 1,
-      "tvTypes": ["movie"]
-    },
-    {
       "name": "Hanime1",
-      "description": "Hanime1 feed — 12 home rows of hentai & MMD in the built-in player.",
+      "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.hiki",
-      "version": 1,
-      "tvTypes": ["movie"]
-    },
-    {
-      "name": "WatchHentai",
-      "description": "1,400+ series & episodes — 720p/1080p direct MP4 streams.",
-      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.hiki",
-      "version": 1,
+      "version": 4,
       "tvTypes": ["movie"]
     },
     {
       "name": "HanimeTV",
-      "description": "Curated 720p/1080p hentai — new releases, trending and random.",
+      "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.hiki",
-      "version": 1,
+      "version": 5,
       "tvTypes": ["movie"]
     },
     {
       "name": "HStream",
-      "description": "English subbed hentai in HD, FHD & 4K.",
+      "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hstream.hiki",
-      "version": 1,
+      "version": 2,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "MissAV (JAV)",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
+      "version": 2,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Oppai Stream",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.hiki",
+      "version": 2,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "WatchHentai",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.hiki",
+      "version": 4,
       "tvTypes": ["movie"]
     }
   ]
