@@ -83,13 +83,38 @@ class HanimetvProvider : HikariProvider {
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val watchUrl = "$BASE/videos/hentai/${media.id}"
+        // HTVPlayer mounts as an Astro island and only boots after the poster
+        // is clicked — the generic autoplay already clicks [aria-label="Play
+        // video"], but this runs a hanime-specific pass too and gives the
+        // handshake → manifest dance a roomier budget.
+        val siteScript = """
+            (function(){
+              var clickit=function(sel){
+                var els=document.querySelectorAll(sel);
+                for(var i=0;i<els.length;i++){
+                  var e=els[i];
+                  if(e.offsetParent!==null||e.getBoundingClientRect().height>0){ try{e.click();}catch(_){} }
+                }
+              };
+              clickit('[aria-label="Play video"]');
+              clickit('.HTVPlayerPoster');
+              clickit('.vjs-big-play-button');
+              var vids=document.querySelectorAll('video');
+              for(var j=0;j<vids.length;j++){
+                var v=vids[j];
+                try{ v.muted=true; var p=v.play(); if(p&&p.catch)p.catch(function(){}); }catch(_){}
+              }
+            })();
+        """.trimIndent()
         val captured = HikariNet.resolveWithWebView(
             watchUrl,
             capture = Regex("""https://[^\s"'\\<>]+\.m3u8(\?[^\s"'\\<>]*)?"""),
             additional = listOf(
                 Regex("""https://[^\s"'\\<>]+/manifest\.mpd(\?[^\s"'\\<>]*)?"""),
                 Regex("""https://[^\s"'\\<>]+\.mp4(\?[^\s"'\\<>]*)?"""),
-            )
+            ),
+            timeoutMs = 90_000,
+            script = siteScript,
         )
         captured.firstOrNull()?.let { hit ->
             val isHls = hit.url.contains(".m3u8")
