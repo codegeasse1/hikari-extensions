@@ -154,12 +154,29 @@ class HanimetvProvider : HikariProvider {
             htmlCache[url]?.let { (t, html) -> if (now - t < CACHE_TTL_MS) return html }
         }
         val html = HikariNet.getStringSmart(url) ?: return null
+        // Never cache a WAF challenge page — after the user completes the
+        // Cloudflare verification in the app's WebView, the retry must re-fetch
+        // for real (caching the challenge HTML would keep things empty for the
+        // whole 10-minute TTL).
+        if (looksLikeChallenge(html)) return null
         cacheMutex.withLock {
             if (htmlCache.size > 30) htmlCache.clear()
             htmlCache[url] = now to html
         }
         return html
     }
+
+    private fun looksLikeChallenge(html: String): Boolean {
+        val probe = html.take(30_000)
+        return CHALLENGE_MARKERS.any { probe.contains(it, ignoreCase = true) }
+    }
+
+    private val CHALLENGE_MARKERS = listOf(
+        "cf-chl-", "challenge-platform", "cf-browser-verification", "cf-mitigated",
+        "cf-turnstile", "Just a moment", "Attention Required!", "enablejs",
+        "Pardon Our Interruption", "Checking your browser", "Verify you are human",
+        "verify you are human", "hcaptcha", "h-captcha", "Access Denied", "datadome",
+    )
 
     private fun metaProperty(html: String, prop: String): String? =
         Regex("""<meta\s+property="[^"]*$prop[^"]*"\s+content="([^"]*)"""")
