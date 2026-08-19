@@ -40,6 +40,34 @@ object HikariNet {
             com.hikari.app.net.Http.getString(url, headers)
         }
 
+    /** STUB — see [getString]. The real POST helpers live in the app's
+     *  com.hikari.ext.HikariNet (parent-first classloading), so extensions can
+     *  call them freely; this body only lets the repo compile. */
+    suspend fun postString(
+        url: String,
+        body: String,
+        headers: Map<String, String> = emptyMap(),
+        contentType: String = "application/json; charset=utf-8",
+    ): String? = withContext(Dispatchers.IO) {
+        com.hikari.app.net.Http.postString(url, body, headers, contentType)
+    }
+
+    suspend fun postJson(
+        url: String,
+        body: JSONObject,
+        headers: Map<String, String> = emptyMap(),
+    ): JSONObject? = withContext(Dispatchers.IO) {
+        postString(url, body.toString(), headers + mapOf("Content-Type" to "application/json; charset=utf-8"))
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+    }
+
+    fun base64Decode(s: String): ByteArray? = runCatching {
+        java.util.Base64.getDecoder().decode(s)
+    }.getOrNull()
+
+    fun base64Encode(bytes: ByteArray): String =
+        java.util.Base64.getEncoder().encodeToString(bytes)
+
     /**
      * GET like [getString], but when the plain HTTP client gets blocked (a
      * WAF challenge page or hard failure) it re-fetches the page inside a real

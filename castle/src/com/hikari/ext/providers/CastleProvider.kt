@@ -7,13 +7,6 @@ import com.hikari.ext.HikariNet
 import com.hikari.ext.HikariProvider
 import com.hikari.ext.HikariStream
 import com.hikari.ext.HikariSubtitle
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import android.util.Base64
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URLEncoder
 import javax.crypto.Cipher
@@ -57,8 +50,6 @@ class CastleProvider : HikariProvider {
         private const val APK_SIGN_KEY = "ED0955EB04E67A1D9F3305B95454FED485261475"
         private const val PEPPER = "T!BgJB"
         private const val CASTLE_UA = "okhttp/4.9.3"
-
-        private val CLIENT = OkHttpClient.Builder().followRedirects(true).build()
     }
 
     private val headers = HikariNet.browserHeaders + mapOf(
@@ -83,12 +74,14 @@ class CastleProvider : HikariProvider {
     }
 
     private fun decrypt(data: String, base64Key: String): String {
-        val material = Base64.decode(base64Key, Base64.DEFAULT) + PEPPER.toByteArray(Charsets.UTF_8)
+        val keyBytes = HikariNet.base64Decode(base64Key) ?: return data
+        val material = keyBytes + PEPPER.toByteArray(Charsets.UTF_8)
         val key = ByteArray(16)
         System.arraycopy(material, 0, key, 0, minOf(material.size, 16))
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(key))
-        return String(cipher.doFinal(Base64.decode(data, Base64.DEFAULT)), Charsets.UTF_8)
+        val blob = HikariNet.base64Decode(data) ?: return data
+        return String(cipher.doFinal(blob), Charsets.UTF_8)
     }
 
     /** Unwraps the `{code,msg,data}` envelope: extracts data if it's an
@@ -107,15 +100,11 @@ class CastleProvider : HikariProvider {
         HikariNet.getString(url, headers)?.let { unwrap(it, key) }
 
     private suspend fun apiPost(url: String, body: JSONObject, key: String): JSONObject? {
-        val raw = withContext(Dispatchers.IO) {
-            runCatching {
-                val req = Request.Builder().url(url)
-                    .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .apply { headers.forEach { (k, v) -> header(k, v) } }
-                    .build()
-                CLIENT.newCall(req).execute().use { it.body?.string() }
-            }.getOrNull()
-        } ?: return null
+        val raw = HikariNet.postString(
+            url,
+            body.toString(),
+            headers + mapOf("Content-Type" to "application/json; charset=utf-8"),
+        ) ?: return null
         return unwrap(raw, key)
     }
 
@@ -177,7 +166,8 @@ class CastleProvider : HikariProvider {
         if (seasons != null && seasonCount > 1) {
             for (i in 0 until seasonCount) {
                 val s = seasons.optJSONObject(i) ?: continue
-                val seasonMovieId = s.optString("movieId").ifBlank { continue }
+                val seasonMovieId = s.optString("movieId")
+                if (seasonMovieId.isBlank()) continue
                 val seasonNum = s.optInt("number", i + 1)
                 val sd = apiGet(detailUrl(seasonMovieId), key) ?: continue
                 sd.optJSONArray("episodes")?.let { eps ->
