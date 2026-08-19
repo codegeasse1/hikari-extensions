@@ -41,6 +41,11 @@ Or download `chaturbate.hiki` and use **Pick .hiki file**.
 |---|---|
 | `chaturbate.hiki` | Live cam rooms from chaturbate.com — public broadcasts play in the built-in player (signed LL-HLS). Uses only public, unauthenticated endpoints. |
 | `missav.hiki` | Free JAV from missav.ws — 100k+ videos across 12 home rows (new releases, hot today, uncensored leak, big breasts, mature woman, creampie, wife, …), genre browsing and search, LL-HLS in the built-in player. |
+| `oppai.hiki` | Hentai anime from oppai.stream in HD/4K — 16 home rows (orders + genres), direct MP4 plus DASH 720/1080/4k streams, no WebView needed. |
+| `hanime1.hiki` | The full hanime1.me feed — 12 home rows (new releases, recent uploads, 裏番, 泡麵番, Motion, 3DCG, 2.5D, 2D, AI, MMD, Cosplay, popular). Streams are captured in a real WebView (Cloudflare). |
+| `watchhentai.hiki` | 1,400+ series & episodes from watchhentai.net — series/episode/genre listings and trending, 720p/1080p direct MP4 streams. |
+| `hanimetv.hiki` | Curated 720p/1080p hentai from hanime.tv — Recent Uploads, New Releases, Trending and Random home rows. Streams are captured in a real WebView (Cloudflare). |
+| `hstream.hiki` | English-subbed hentai in HD/FHD/4K from hstream.moe — 7 order-based browse rows and working search, DASH streams captured in a real WebView. |
 
 ## Building an extension
 

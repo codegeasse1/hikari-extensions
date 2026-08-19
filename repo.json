@@ -15,6 +15,41 @@
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
       "version": 1,
       "tvTypes": ["movie"]
+    },
+    {
+      "name": "Oppai Stream",
+      "description": "Hentai anime in HD & 4K — direct Blu-ray rips, many genres.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.hiki",
+      "version": 1,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Hanime1",
+      "description": "Hanime1 feed — 12 home rows of hentai & MMD in the built-in player.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.hiki",
+      "version": 1,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "WatchHentai",
+      "description": "1,400+ series & episodes — 720p/1080p direct MP4 streams.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.hiki",
+      "version": 1,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "HanimeTV",
+      "description": "Curated 720p/1080p hentai — new releases, trending and random.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.hiki",
+      "version": 1,
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "HStream",
+      "description": "English subbed hentai in HD, FHD & 4K.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hstream.hiki",
+      "version": 1,
+      "tvTypes": ["movie"]
     }
   ]
 }
