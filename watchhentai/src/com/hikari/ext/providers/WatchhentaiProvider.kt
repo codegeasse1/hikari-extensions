@@ -14,9 +14,11 @@ import java.net.URLDecoder
 /**
  * WatchHentai (watchhentai.net) — Dooplay (WordPress) hentai site.
  *
- *  - listings: `/tvshows/page/N/` (series), `/episodes/page/N/` (episodes),
+ *  - listings: `/series/page/N/` (series), `/videos/page/N/` (episodes),
  *    `/genre/<slug>/page/N/` and `/trending/` — all plain server-rendered
- *    HTML, no Cloudflare.
+ *    HTML, no Cloudflare.  (The old `/tvshows/` listing slug now serves 404.)
+ *  - a series page (`/series/<slug>/`) lists its episodes as
+ *    `<li class='mark-N'>` items whose links point to `/videos/<ep-slug>/`.
  *  - a video page (`/videos/<slug>/`) embeds a jwplayer iframe whose
  *    `source` query param is the direct `https://hstorage.xyz/files/J/<folder>/…mp4`;
  *    the jwplayer page additionally serves `_1080p.mp4` / `_720p.mp4` variants,
@@ -57,7 +59,7 @@ class WatchhentaiProvider : HikariProvider {
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
         val url = when (catalog.id) {
-            "series" -> pageUrl("$BASE/tvshows/", page)
+            "series" -> pageUrl("$BASE/series/", page)
             // /videos/ is the episodes listing (the /episodes/ slug has been
             // intermittently serving 404 while /videos/ is the same page).
             "episodes" -> pageUrl("$BASE/videos/", page)
@@ -87,7 +89,10 @@ class WatchhentaiProvider : HikariProvider {
         val title = media.title.lowercase().trim()
         val out = mutableListOf<HikariEpisode>()
         for (e in parseEpisodes(html)) {
-            if (title.isBlank() || e.serie.lowercase().trim() == title) {
+            // Series-page <li> items carry no serie name, so accept them all;
+            // listing-card items only when their serie matches (or is blank).
+            val serie = e.serie.lowercase().trim()
+            if (title.isBlank() || e.serie.isBlank() || serie == title) {
                 out += HikariEpisode(
                     number = e.number,
                     id = e.slug,
@@ -136,15 +141,24 @@ class WatchhentaiProvider : HikariProvider {
     //  Parsing
     // ------------------------------------------------------------------
 
+    // Handles every card variant: genre/trending cards
+    // (`<article id="post-N" class="item tvshows">` with a poster + title attr),
+    // and the homepage slider (`<article class="item" id="post-N">` with a
+    // backdrop + `<h3 class="title">`).  Skips `sidebar.php` thumbs so
+    // sidebar duplicates can't shadow the real grid entries.
     private fun parseSeriesCards(html: String): List<HikariMedia> {
         val re = Regex(
-            """<article id="post-\d+" class="item tvshows">[\s\S]*?data-src="([^"]+)"[\s\S]*?<h3><a href="https://watchhentai\.net/series/([^"]+)/" title="([^"]*)">"""
+            """data-src=["']((?![^"']*sidebar\.php)[^"']+)["'][\s\S]{0,3000}?<a href="https://watchhentai\.net/series/([^"]+)/"[^>]*?title="([^"]*)"[\s\S]{0,600}?(?:<h3[^>]*>([\s\S]*?)</h3>)?"""
         )
         val out = LinkedHashMap<String, HikariMedia>()
         for (m in re.findAll(html)) {
             val slug = m.groupValues[2]
-            val title = unescape(m.groupValues[3])
-            if (slug.isBlank() || title.isBlank()) continue
+            if (slug.isBlank()) continue
+            val h3 = m.groupValues[4]
+            val title = unescape(
+                if (h3.isNotBlank() && !h3.contains("<")) h3 else m.groupValues[3]
+            )
+            if (title.isBlank()) continue
             out[slug] = HikariMedia(
                 id = slug,
                 title = title,
@@ -173,11 +187,14 @@ class WatchhentaiProvider : HikariProvider {
     )
 
     private fun parseEpisodes(html: String): List<Ep> {
-        val re = Regex(
+        val out = LinkedHashMap<String, Ep>()
+
+        // Pattern A — episode listing cards on `/videos/`:
+        // <article class="item se episodes">…data-src="IMG"…<a href="…/videos/SLUG/">…<span class="serie">S</span>…<h3>Episode N</h3>
+        val reA = Regex(
             """<article class="item se episodes"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?<a href="https://watchhentai\.net/videos/([^"]+)/"[\s\S]*?<span class="serie">([\s\S]*?)</span>[\s\S]*?<h3>Episode\s*(\d+)</h3>"""
         )
-        val out = LinkedHashMap<String, Ep>()
-        for (m in re.findAll(html)) {
+        for (m in reA.findAll(html)) {
             // group 1 = the poster's data-src (image URL), group 2 = the video
             // page slug — they were swapped before, so every episode's id was
             // the IMAGE URL and the video page fetch 404'd ("no playable
@@ -191,6 +208,23 @@ class WatchhentaiProvider : HikariProvider {
                 poster = m.groupValues[1].takeIf { it.startsWith("http") },
             )
         }
+
+        // Pattern B — episode list on a series page:
+        // <li class='mark-N'><div class='imagen'><img … data-src='POSTER' …></div><div class='episodiotitle'><a href='https://watchhentai.net/videos/SLUG/' title='Episode N (PREVIEW) Watch Hentai'>
+        val reB = Regex(
+            """<li class='mark-\d+'[^>]*>[\s\S]*?data-src='([^']+)'[\s\S]*?<a href='https://watchhentai\.net/videos/([^']+)/'[^>]*title='Episode\s*(\d+)"""
+        )
+        for (m in reB.findAll(html)) {
+            val slug = m.groupValues[2]
+            if (out.containsKey(slug)) continue
+            out[slug] = Ep(
+                slug = slug,
+                serie = "",
+                number = m.groupValues[3].toIntOrNull() ?: 1,
+                poster = m.groupValues[1].takeIf { it.startsWith("http") },
+            )
+        }
+
         return out.values.toList()
     }
 
