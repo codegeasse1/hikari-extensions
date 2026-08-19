@@ -28,6 +28,7 @@ class HanimetvProvider : HikariProvider {
     override val id = "hanimetv"
     override val name = "HanimeTV"
     override val mainUrl = "https://hanime.tv"
+    override val version = 5
     override val description = "Curated 720p/1080p hentai — new releases, trending and random."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
@@ -83,39 +84,84 @@ class HanimetvProvider : HikariProvider {
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val watchUrl = "$BASE/videos/hentai/${media.id}"
-        // HTVPlayer mounts as an Astro island and only boots after the poster
-        // is clicked — the generic autoplay already clicks [aria-label="Play
-        // video"], but this runs a hanime-specific pass too and gives the
-        // handshake → manifest dance a roomier budget.
-        val siteScript = """
-            (function(){
-              var clickit=function(sel){
-                var els=document.querySelectorAll(sel);
-                for(var i=0;i<els.length;i++){
-                  var e=els[i];
-                  if(e.offsetParent!==null||e.getBoundingClientRect().height>0){ try{e.click();}catch(_){} }
-                }
-              };
-              clickit('[aria-label="Play video"]');
-              clickit('.HTVPlayerPoster');
-              clickit('.vjs-big-play-button');
-              var vids=document.querySelectorAll('video');
-              for(var j=0;j<vids.length;j++){
-                var v=vids[j];
-                try{ v.muted=true; var p=v.play(); if(p&&p.catch)p.catch(function(){}); }catch(_){}
-              }
-            })();
-        """.trimIndent()
+        // The player only serves its stream after a signed/encrypted handshake
+        // (`POST auth.hanime.tv/api/v11/handshake`, AES-GCM envelope + a WASM
+        // request signature) and a preroll ad — so waiting for the video
+        // request to happen naturally is fragile. Instead this script runs
+        // inside the page (where the WASM signature + session cookies exist),
+        // performs the handshake itself, decrypts the `x-token` response, and
+        // exfiltrates each source URL through a dummy image request that the
+        // app's WebView capture picks up. No playback/ad dependency at all.
+        val slug = media.id
+        val siteScript = buildString {
+            append("""(function(){
+  if (window.__htvExfil) return; window.__htvExfil = 1;
+  var SLUG = """)
+            append(JSON.stringify(slug))
+            append(""";
+  var SECRET = "htv-insecure-handshake-v1";
+  var EXTRA = "htv-insecure-v1";
+  var te = new TextEncoder(), td = new TextDecoder();
+  function b64u(b){ var s=""; for(var i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+  function b64d(s){ var t=String(s||"").replace(/-/g,"+").replace(/_/g,"/"); t=t.padEnd(Math.ceil(t.length/4)*4,"="); var r=atob(t),u=new Uint8Array(r.length); for(var i=0;i<r.length;i++)u[i]=r.charCodeAt(i); return u; }
+  function key(usage){ return crypto.subtle.digest("SHA-256",te.encode(SECRET)).then(function(d){ return crypto.subtle.importKey("raw",d,{name:"AES-GCM"},false,usage); }); }
+  function encrypt(obj){ var iv=crypto.getRandomValues(new Uint8Array(12)); return key(["encrypt"]).then(function(k){ return crypto.subtle.encrypt({name:"AES-GCM",iv:iv,additionalData:te.encode(EXTRA),tagLength:128},k,te.encode(JSON.stringify(obj))); }).then(function(ct){ ct=new Uint8Array(ct); var env={v:1,alg:"AES-256-GCM",iv:b64u(iv),tag:b64u(ct.slice(-16)),data:b64u(ct.slice(0,-16))}; return b64u(te.encode(JSON.stringify(env))); }); }
+  function decrypt(tok){ var j=JSON.parse(td.decode(b64d(tok))); return key(["decrypt"]).then(function(k){ var a=[].slice.call(b64d(j.data)),b=[].slice.call(b64d(j.tag)),full=new Uint8Array(a.concat(b)); return crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(j.iv),additionalData:te.encode(EXTRA),tagLength:128},k,full); }).then(function(pt){ return td.decode(pt); }); }
+  function emit(){ try{ if(typeof window.Emit==="function"){ window.Emit("e",{}); return; } window.dispatchEvent(new CustomEvent("e",{detail:{}})); }catch(e){} }
+  function getCsrf(){ try{ if(window.S && window.S.csrf_token) return Promise.resolve(window.S.csrf_token); }catch(e){} return fetch("https://ct.hanime.tv/csrf-token",{credentials:"include"}).then(function(r){ return r.json(); }).then(function(j){ return j.csrf_token||""; }).catch(function(){ return ""; }); }
+  function exfil(url){ try{ if(url){ new Image().src="https://m.capture/x?u="+encodeURIComponent(url); } }catch(e){} }
+  function waitFor(fn,ms){ return new Promise(function(res){ var t0=Date.now(); (function poll(){ if(fn()){ res(true); return; } if(Date.now()-t0>ms){ res(false); return; } setTimeout(poll,500); })(); }); }
+  function fire(){
+    emit();
+    Promise.all([
+      waitFor(function(){ return !!(window.ssignature && window.stime); }, 25000),
+      waitFor(function(){ return !!(window.crypto && window.crypto.subtle); }, 25000)
+    ]).then(function(){
+      getCsrf().then(function(csrf){
+        encrypt({timestamp_unix:parseInt(Date.now()/1000,10),directive:"htv_player_handshake",slug:SLUG}).then(function(token){
+          return fetch("https://auth.hanime.tv/api/v11/handshake",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json","Accept":"application/json","x-signature-version":"web2","x-signature":window.ssignature||"","x-time":String(window.stime||""),"x-csrf-token":csrf},body:JSON.stringify({token:token})});
+        }).then(function(r){
+          var xt=r.headers.get("x-token");
+          if(!xt) return null;
+          return decrypt(xt);
+        }).then(function(plain){
+          if(!plain) return;
+          try{ var d=JSON.parse(plain); (d.sources||[]).forEach(function(s){ if(s&&s.url) exfil(s.url); }); }catch(e){}
+        }).catch(function(){});
+      });
+    });
+  }
+  if(document.readyState==="complete") fire(); else window.addEventListener("load", fire);
+  setTimeout(fire, 4000);
+})();""")
+        }
         val captured = HikariNet.resolveWithWebView(
             watchUrl,
-            capture = Regex("""https://[^\s"'\\<>]+\.m3u8(\?[^\s"'\\<>]*)?"""),
+            capture = Regex("""https://m\.capture/x\?u=([^&"'\s]+)"""),
             additional = listOf(
+                Regex("""https://[^\s"'\\<>]+\.m3u8(\?[^\s"'\\<>]*)?"""),
                 Regex("""https://[^\s"'\\<>]+/manifest\.mpd(\?[^\s"'\\<>]*)?"""),
                 Regex("""https://[^\s"'\\<>]+\.mp4(\?[^\s"'\\<>]*)?"""),
             ),
-            timeoutMs = 90_000,
+            timeoutMs = 75_000,
             script = siteScript,
         )
+        val exfil = captured.filter { it.url.startsWith("https://m.capture/x") }
+        if (exfil.isNotEmpty()) {
+            return exfil.mapNotNull { hit ->
+                val enc = Regex("""\?u=([^&"'\s]+)""").find(hit.url)?.groupValues?.get(1) ?: return@mapNotNull null
+                val realUrl = runCatching { java.net.URLDecoder.decode(enc, "UTF-8") }.getOrNull()
+                    ?: return@mapNotNull null
+                if (realUrl.isBlank()) return@mapNotNull null
+                HikariStream(
+                    name = if (realUrl.contains(".m3u8")) "HLS" else if (realUrl.contains(".mpd")) "DASH" else "MP4",
+                    url = realUrl,
+                    headers = hit.headers + mapOf("Referer" to "$BASE/"),
+                    isM3u8 = realUrl.contains(".m3u8"),
+                    isMpd = realUrl.contains(".mpd"),
+                )
+            }.distinctBy { it.url }
+        }
         captured.firstOrNull()?.let { hit ->
             val isHls = hit.url.contains(".m3u8")
             val isMpd = hit.url.contains(".mpd")
