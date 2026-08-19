@@ -161,7 +161,7 @@ class HstreamProvider : HikariProvider {
         cacheMutex.withLock {
             htmlCache[url]?.let { (t, html) -> if (now - t < CACHE_TTL_MS) return html }
         }
-        val html = HikariNet.getString(url) ?: return null
+        val html = HikariNet.getStringSmart(url) ?: return null
         cacheMutex.withLock {
             if (htmlCache.size > 40) htmlCache.clear()
             htmlCache[url] = now to html

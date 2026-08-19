@@ -70,7 +70,7 @@ class Hanime1Provider : HikariProvider {
         if (page <= 1) return cardsIn(rows, row)
         // Row paging goes through the (CF-protected) search endpoint — best effort.
         val url = row.href + "&page=$page"
-        return parseCards(HikariNet.getString(url) ?: return emptyList())
+        return parseCards(HikariNet.getStringSmart(url) ?: return emptyList())
     }
 
     override suspend fun search(query: String, page: Int): List<HikariMedia> {
@@ -78,13 +78,13 @@ class Hanime1Provider : HikariProvider {
         if (q.isBlank()) return emptyList()
         val enc = URLEncoder.encode(q, "UTF-8").replace("+", "%20")
         val url = "$BASE/search?query=$enc&sort=最新上傳&page=$page"
-        val html = HikariNet.getString(url) ?: return emptyList()
+        val html = HikariNet.getStringSmart(url) ?: return emptyList()
         return parseCards(html)
     }
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         // Watch pages are CF-challenged; try anyway and fall back to the card data.
-        val page = HikariNet.getString("$BASE/watch?v=${media.id}") ?: return media
+        val page = HikariNet.getStringSmart("$BASE/watch?v=${media.id}") ?: return media
         val ogTitle = metaProperty(page, "og:title")?.let { unescape(it) }
         val ogImage = metaProperty(page, "og:image")
         return media.copy(
@@ -169,7 +169,7 @@ class Hanime1Provider : HikariProvider {
         cacheMutex.withLock {
             htmlCache[url]?.let { (t, html) -> if (now - t < CACHE_TTL_MS) return html }
         }
-        val html = HikariNet.getString(url) ?: return null
+        val html = HikariNet.getStringSmart(url) ?: return null
         cacheMutex.withLock {
             if (htmlCache.size > 30) htmlCache.clear()
             htmlCache[url] = now to html

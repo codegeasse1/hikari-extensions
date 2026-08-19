@@ -1,5 +1,5 @@
 {
   "name": "Hanime1",
-  "version": 1,
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.Hanime1Provider"
 }

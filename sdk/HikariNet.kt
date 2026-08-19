@@ -40,6 +40,26 @@ object HikariNet {
             com.hikari.app.net.Http.getString(url, headers)
         }
 
+    /**
+     * GET like [getString], but when the plain HTTP client gets blocked (a
+     * WAF challenge page or hard failure) it re-fetches the page inside a real
+     * WebView and returns the rendered HTML. This is the helper catalog/search/
+     * video pages should use — okhttp alone is Cloudflare-blocked on several
+     * sites that serve real browsers fine. STUB: the real implementation lives
+     * in the app's com.hikari.ext.HikariNet (parent-first classloading), so
+     * this body only exists to let the extension repo compile.
+     */
+    suspend fun getStringSmart(url: String, headers: Map<String, String> = emptyMap()): String? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getStringSmart(url, headers)
+        }
+
+    /** STUB — see [getStringSmart]. */
+    suspend fun getStringRendered(url: String, timeoutMs: Long = 25_000): String? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getStringRendered(url, timeoutMs)
+        }
+
     /** GET and parse the response as JSON (null on failure). */
     suspend fun getJson(url: String, headers: Map<String, String> = emptyMap()): JSONObject? =
         withContext(Dispatchers.IO) {

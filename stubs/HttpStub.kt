@@ -11,5 +11,7 @@ object Http {
     fun get(url: String, headers: Map<String, String> = emptyMap()): Response =
         throw UnsupportedOperationException("stub")
     fun getString(url: String, headers: Map<String, String> = emptyMap()): String? = null
+    fun getStringSmart(url: String, headers: Map<String, String> = emptyMap()): String? = null
+    fun getStringRendered(url: String, timeoutMs: Long = 25_000): String? = null
     fun getBytes(url: String, headers: Map<String, String> = emptyMap()): ByteArray? = null
 }
