@@ -7,56 +7,73 @@
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/castle.hiki",
       "version": 2,
-      "tvTypes": ["movie", "tv"]
+      "tvTypes": [
+        "movie",
+        "tv"
+      ]
     },
     {
       "name": "Chaturbate (Hikari)",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.hiki",
       "version": 2,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "Hanime1",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.hiki",
       "version": 4,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "HanimeTV",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.hiki",
-      "version": 5,
-      "tvTypes": ["movie"]
+      "version": 6,
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "HStream",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hstream.hiki",
       "version": 2,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "MissAV (JAV)",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
       "version": 2,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "Oppai Stream",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.hiki",
       "version": 2,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     },
     {
       "name": "WatchHentai",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.hiki",
       "version": 4,
-      "tvTypes": ["movie"]
+      "tvTypes": [
+        "movie"
+      ]
     }
   ]
 }

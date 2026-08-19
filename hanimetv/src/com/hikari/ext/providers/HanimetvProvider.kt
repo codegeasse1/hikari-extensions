@@ -28,7 +28,7 @@ class HanimetvProvider : HikariProvider {
     override val id = "hanimetv"
     override val name = "HanimeTV"
     override val mainUrl = "https://hanime.tv"
-    override val version = 5
+    override val version = 6
     override val description = "Curated 720p/1080p hentai — new releases, trending and random."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
@@ -126,7 +126,7 @@ class HanimetvProvider : HikariProvider {
           return decrypt(xt);
         }).then(function(plain){
           if(!plain) return;
-          try{ var d=JSON.parse(plain); (d.sources||[]).forEach(function(s){ if(s&&s.url) exfil(s.url); }); }catch(e){}
+          try{ var d=JSON.parse(plain); (d.sources||[]).forEach(function(s){ if(s){ var u=(s&&(s.src||s.url))||""; if(u) exfil(u); } }); }catch(e){}
         }).catch(function(){});
       });
     });
@@ -162,7 +162,7 @@ class HanimetvProvider : HikariProvider {
                 )
             }.distinctBy { it.url }
         }
-        captured.firstOrNull()?.let { hit ->
+        captured.firstOrNull { !it.url.startsWith("https://m.capture/") }?.let { hit ->
             val isHls = hit.url.contains(".m3u8")
             val isMpd = hit.url.contains(".mpd")
             return listOf(
