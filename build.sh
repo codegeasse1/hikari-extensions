@@ -87,12 +87,15 @@ generate_repo_json() {
     local ver
     ver=$(sed -n 's/.*"version"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$name/manifest.json" | head -1)
     ver="${ver:-1}"
+    local tvtypes
+    tvtypes=$(sed -n 's/.*"tvTypes"[^[]*\[\([^]]*\)\].*/\1/p' "$name/manifest.json" | head -1)
+    [ -n "$tvtypes" ] || tvtypes='"movie"'
     printf '    {\n'
     printf '      "name": "%s",\n' "$(sed -n 's/.*"name"[^"]*"\([^"]*\)".*/\1/p' "$name/manifest.json" | head -1)"
     printf '      "description": "%s",\n' "Auto-built Hikari extension from this repo."
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.hiki",\n' "$name"
     printf '      "version": %s,\n' "$ver"
-    printf '      "tvTypes": ["movie"]\n'
+    printf '      "tvTypes": [%s]\n' "$tvtypes"
     printf '    }'
   done
   echo ""
