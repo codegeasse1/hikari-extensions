@@ -46,6 +46,26 @@ Or download `chaturbate.hiki` and use **Pick .hiki file**.
 | `watchhentai.hiki` | 1,400+ series & episodes from watchhentai.net — series/episode/genre listings and trending, 720p/1080p direct MP4 streams. |
 | `hanimetv.hiki` | Curated 720p/1080p hentai from hanime.tv — Recent Uploads, New Releases, Trending and Random home rows. Streams are captured in a real WebView (Cloudflare). |
 | `hstream.hiki` | English-subbed hentai in HD/FHD/4K from hstream.moe — 7 order-based browse rows and working search, DASH streams captured in a real WebView. |
+| `cncverse.hiki` | The whole CNC Verse repo as **49 providers** — CNC Verse (Disney+/Netflix/Prime/Hotstar mirrors), MovieBox, TamilDhool, Tamilian, Pikashow, Cricify, HDrezka, Golden Audiobook and more. |
+| `phisher.hiki` | The whole phisher98 repo as **101 providers** — MovieBlast, Movies4u, StreamPlay, StremioX, ShowBox, TorraStream, Kickassanime, Animexin, QuickIPTV (Sony/Japan/Sports/Pirate IPTV), YTS, Tamilblasters and more. |
+
+## CloudStream bridge extensions
+
+`cncverse.hiki` and `phisher.hiki` aren't hand-ported — they **bundle the repos'
+compiled `.cs3` files** and load them through Hikari's real CloudStream runtime
+(CloudStream's own plugin `load()`, extractors, WebView captures and signed-URL
+logic all run unmodified, exactly as if the `.cs3` had been installed directly).
+Each `.cs3` becomes one or more providers (`src/…/Cs3BridgeProvider.kt` adapts a
+plugin's `MainAPI` to the Hikari SDK; the manifest registers one wrapper class
+per provider). This is why every extension in those two repos is available the
+moment this release ships, no porting needed.
+
+At build time `build.sh` downloads the `.cs3` files fresh from the upstream
+repos' `builds` branches (see each bridge dir's `bridge-sources.txt`), so every
+CI build ships the current upstream builds.
+
+Installing both alongside the same providers installed natively as `.cs3` will
+show duplicates — disable one set in Settings → Providers.
 
 ## Building an extension
 

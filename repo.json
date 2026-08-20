@@ -22,6 +22,16 @@
       ]
     },
     {
+      "name": "CNC Verse",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse.hiki",
+      "version": 1,
+      "tvTypes": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
       "name": "Hanime1",
       "description": "Auto-built Hikari extension from this repo.",
       "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.hiki",
@@ -64,6 +74,16 @@
       "version": 2,
       "tvTypes": [
         "movie"
+      ]
+    },
+    {
+      "name": "Phisher",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher.hiki",
+      "version": 1,
+      "tvTypes": [
+        "movie",
+        "tv"
       ]
     },
     {
