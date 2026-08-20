@@ -11,12 +11,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: curl probe
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Playwright
         run: |
           mkdir -p probes
-          curl -sS "https://core.justanime.to/api/home" -H "Origin: https://justanime.to" -o probes/home.json || echo "CURL FAILED"
-          wc -c probes/home.json
-          head -c 800 probes/home.json
+          npm init -y >/dev/null
+          npm i playwright@1.45.0 >/dev/null 2>&1
+          npx playwright install chromium --with-deps >/dev/null 2>&1 || npx playwright install chromium
+      - name: Probe justanime
+        run: node probe.js
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
