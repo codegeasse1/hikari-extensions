@@ -3,7 +3,6 @@ AnimeSuge.cs3	AnimeSuge.cs3
 BilibiliProvider.cs3	BilibiliProvider.cs3
 CNC Verse Mobile.cs3	CNC_Verse_Mobile.cs3
 CNC Verse.cs3	CNC_Verse.cs3
-CastleTvProvider.cs3	CastleTvProvider.cs3
 CineTvProvider.cs3	CineTvProvider.cs3
 CricifyProvider.cs3	CricifyProvider.cs3
 DesiSerialsProvider.cs3	DesiSerialsProvider.cs3
@@ -28,7 +27,6 @@ Rtally.cs3	Rtally.cs3
 SKTechProvider.cs3	SKTechProvider.cs3
 SportzxProvider.cs3	SportzxProvider.cs3
 StreamFlixProvider.cs3	StreamFlixProvider.cs3
-SubscriptionManager.cs3	SubscriptionManager.cs3
 TamilDhoolProvider.cs3	TamilDhoolProvider.cs3
 TamilUltraProvider.cs3	TamilUltraProvider.cs3
 Tamilian.cs3	Tamilian.cs3
