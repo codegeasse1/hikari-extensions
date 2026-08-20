@@ -1,0 +1,59 @@
+name: Probe justanime API
+on:
+  push:
+    paths: [".github/workflows/probe.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe
+        run: |
+          mkdir -p probes
+          H=(-H "Origin: https://justanime.to" -H "Referer: https://justanime.to/" -H "User-Agent: Mozilla/5.0")
+          curl -sS "${H[@]}" "https://core.justanime.to/api/home" -o probes/home.json
+          curl -sS "${H[@]}" "https://core.justanime.to/api/genre" -o probes/genre.json
+          curl -sS "${H[@]}" "https://core.justanime.to/api/search?query=one%20piece" -o probes/search.json
+          ID=$(python3 -c "
+import json
+d=json.load(open('probes/home.json'))
+def walk(o):
+    if isinstance(o,dict):
+        if isinstance(o.get('id'),int): return o['id']
+        for v in o.values():
+            r=walk(v)
+            if r: return r
+    elif isinstance(o,list):
+        for v in o:
+            r=walk(v)
+            if r: return r
+print(walk(d) or '')")
+          echo "ID=$ID"
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/anime/$ID" -o probes/anime.json
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/watch/$ID/episode/1" -o probes/watch.json
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/watch/$ID/episode/1/availability" -o probes/avail.json
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/watch/$ID/episode/1/anineko/neko" -o probes/anineko.json
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/watch/$ID/episode/1/animegg" -o probes/animegg.json
+          [ -n "$ID" ] && curl -sS "${H[@]}" "https://core.justanime.to/api/watch/$ID/episode/1/megaplay" -o probes/megaplay.json
+          curl -sS "https://core.justanime.to/api/home" -o probes/home-noorigin.json || true
+          if [ -f probes/anineko.json ]; then
+            URL=$(python3 -c "
+import json
+d=json.load(open('probes/anineko.json'))
+src=(d.get('sources') or [])
+print(src[0].get('url','') if src else '')" 2>/dev/null || true)
+            echo "SOURCE_URL=$URL"
+            if [ -n "$URL" ]; then
+              ENC=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$URL")
+              curl -sS -o probes/proxy.m3u8 "https://neko.justanime.to/m3u8-proxy?url=$ENC" || true
+              head -c 400 probes/proxy.m3u8 || true
+            fi
+          fi
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: probes
+          path: probes/
