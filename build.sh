@@ -81,13 +81,25 @@ for dir in */; do
   # lists "<upstream path>\t<packaged filename>" lines. A failed fetch aborts
   # the build (a missing .cs3 means broken providers).
   if [ -f "$name/bridge-cs3.conf" ] && [ -f "$name/bridge-sources.txt" ]; then
+    urlencode() {
+      local s="$1" enc="" c h
+      while [ -n "$s" ]; do
+        c="${s:0:1}"
+        case "$c" in
+          [a-zA-Z0-9._~-]) enc+="$c" ;;
+          *) printf -v h '%%%02X' "'$c"; enc+="$h" ;;
+        esac
+        s="${s:1}"
+      done
+      echo "$enc"
+    }
     . "$name/bridge-cs3.conf"
     mkdir -p "build/pkg/cs3/$bridge_subdir"
     while IFS=$'\t' read -r upstream packaged; do
       [ -z "$upstream" ] && continue
       packaged="${packaged:-$upstream}"
       curl -fsSL -o "build/pkg/cs3/$bridge_subdir/$packaged" \
-        "https://raw.githubusercontent.com/$bridge_repo/builds/$upstream"
+        "https://raw.githubusercontent.com/$bridge_repo/builds/$(urlencode "$upstream")"
     done < "$name/bridge-sources.txt"
   fi
 
