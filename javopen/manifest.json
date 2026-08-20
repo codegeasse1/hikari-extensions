@@ -1,0 +1,6 @@
+{
+  "name": "JavOpen",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.JavOpenProvider",
+  "tvTypes": ["movie"]
+}
