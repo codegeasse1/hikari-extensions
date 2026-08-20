@@ -18,10 +18,13 @@ import java.net.URLEncoder
  *    `/categories/<slug>/`, `/search/?q=<query>`) are plain HTML grids of
  *    cards, one `<a href="…/<id>/<slug>/">` poster link + its `<img data-src>`.
  *  - An embed page (`/embed/<id>`) carries a `flashvars` object with a direct
- *    MP4 URL in `video_url` (plus the site's canonical preview image).
+ *    MP4 URL in `video_url` (plus the site's canonical preview image). The
+ *    higher-quality variants (`video_alt_url[_2|_3]`) and the tokenized file
+ *    URLs live on the full video page, so getStreams merges both.
  *
  * All three sites serve the same KVS HTML, differing only in hostname, URL
- * shapes and thumbnail CDN — the differences are the abstract members here.
+ * shapes, thumbnail CDN and the CDN headers get_file needs — the differences
+ * are the abstract members here.
  */
 abstract class KvsTubeProvider : HikariProvider {
 
@@ -41,6 +44,12 @@ abstract class KvsTubeProvider : HikariProvider {
         private const val CACHE_TTL_MS = 600_000L
         private val htmlCache = HashMap<String, Pair<Long, String>>()
         private val cacheMutex = Mutex()
+
+        private val pageHeaders = mapOf(
+            "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
+            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language" to "en-US,en;q=0.9",
+        )
     }
 
     override fun catalogs(): List<HikariCatalog> = buildList {
@@ -107,28 +116,50 @@ abstract class KvsTubeProvider : HikariProvider {
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val id = media.id.trim()
         if (!id.all { it.isDigit() }) return emptyList()
-        val page = getCached("$base/embed/$id") ?: return emptyList()
-        val fv = flashvarsBlock(page) ?: return emptyList()
-        val url = flashvarString(fv, "video_url")
-            ?.takeIf { it.startsWith("http") && it.contains("/get_file/") } ?: return emptyList()
-        val label = flashvarString(fv, "video_url_text")
-            ?.takeIf { it.isNotBlank() }
-            ?: "Video"
-        return listOf(
+
+        // url -> quality label, merged from the embed page AND the full video
+        // page (the full page carries the higher-res `video_alt_url*` files).
+        val urls = LinkedHashMap<String, String>()
+        fun collect(fv: String) {
+            for (key in listOf("video_url", "video_alt_url", "video_alt_url2", "video_alt_url3")) {
+                val u = flashvarString(fv, key)
+                    ?.takeIf { it.startsWith("http") && it.contains("/get_file/") } ?: continue
+                val label = flashvarString(fv, "${key}_text")
+                    ?.takeIf { it.isNotBlank() } ?: "Video"
+                urls[u] = label
+            }
+        }
+
+        val embedPage = getCached("$base/embed/$id")
+        if (embedPage != null) flashvarsBlock(embedPage)?.let { collect(it) }
+
+        if (urls.size < 2) {
+            val pageUrl = embedPage?.let { p ->
+                flashvarsBlock(p)?.let { fv ->
+                    listOf("video_alt_url", "video_alt_url2", "video_alt_url3")
+                        .mapNotNull { flashvarString(fv, it) }
+                        .firstOrNull { it.startsWith("http") && !it.contains("/get_file/") }
+                }
+            } ?: "$base/$videoPath/$id"
+            getCached(pageUrl)?.let { p -> flashvarsBlock(p)?.let { collect(it) } }
+        }
+        if (urls.isEmpty()) return emptyList()
+
+        return urls.map { (u, label) ->
             HikariStream(
                 name = label,
-                url = url,
+                url = u,
                 headers = streamHeaders,
-                isM3u8 = url.contains(".m3u8", ignoreCase = true),
+                isM3u8 = u.contains(".m3u8", ignoreCase = true),
             )
-        )
+        }
     }
 
     // ------------------------------------------------------------------
     //  HTML helpers
     // ------------------------------------------------------------------
 
-    /** Fetches an HTML page once per CACHE_TTL_MS. */
+    /** Fetches an HTML page once per CACHE_TTL_MS (WebView-fallback on WAF blocks). */
     private suspend fun getCached(url: String): String? {
         val now = System.currentTimeMillis()
         cacheMutex.withLock {
@@ -136,9 +167,9 @@ abstract class KvsTubeProvider : HikariProvider {
                 if (now - t < CACHE_TTL_MS) return html
             }
         }
-        val html = HikariNet.getString(url) ?: return null
+        val html = HikariNet.getStringSmart(url, pageHeaders) ?: return null
         cacheMutex.withLock {
-            if (htmlCache.size > 60) htmlCache.clear()
+            if (htmlCache.size > 80) htmlCache.clear()
             htmlCache[url] = now to html
         }
         return html
@@ -151,8 +182,8 @@ abstract class KvsTubeProvider : HikariProvider {
      */
     protected fun parseCards(html: String): List<HikariMedia> {
         val splitRe = Regex("(?=<a [^>]*href=\"${Regex.escape(base)}/$videoPath/)")
-        val anchorRe = Regex("""<a [^>]*href="$base/$videoPath/([^"]+?)/?"[^>]*?(?:title="([^"]*)")?""")
-        val posterRe = Regex("""data-src="((?:https?:)?//[^"]*?\.jpg(?:[?][^"]*)?)""")
+        val anchorRe = Regex("""<a [^>]*href="$base/$videoPath/([^\"]+?)/?\"[^>]*?(?:title=\"([^\"]*)\")?""")
+        val posterRe = Regex("""data-src="((?:https?:)?//[^\"]*?\.jpg(?:[?][^\"]*)?)"""")
         val out = LinkedHashMap<String, HikariMedia>()
         for (chunk in html.split(splitRe)) {
             val anchor = anchorRe.find(chunk) ?: continue
@@ -160,7 +191,7 @@ abstract class KvsTubeProvider : HikariProvider {
             val id = idFromPosterRe.find(poster)?.groupValues?.get(1) ?: continue
             var title = unescapeEntities(anchor.groupValues[2]).trim()
             if (title.isBlank()) {
-                title = Regex("""alt="([^"]*)""").find(chunk)?.groupValues?.get(1)
+                title = Regex("""alt="([^\"]*)"""").find(chunk)?.groupValues?.get(1)
                     ?.let { unescapeEntities(it).trim() } ?: ""
             }
             if (title.isBlank()) continue
@@ -212,11 +243,11 @@ class WhoresHubProvider : KvsTubeProvider() {
     override val name = "WhoresHub"
     override val mainUrl = "https://www.whoreshub.com"
     override val description = "Large HD tube of straight/gonzo videos. Direct MP4 streams."
-    override val version = 1
+    override val version = 2
 
     override val base = "https://www.whoreshub.com"
     override val videoPath = "videos"
-    override val streamHeaders: Map<String, String> = emptyMap()
+    override val streamHeaders: Map<String, String> = mapOf("Referer" to "https://www.whoreshub.com/")
     override val idFromPosterRe = Regex("""/videos_screenshots/\d+/(\d+)/""")
     override val categoryRows: List<Pair<String, String>> = listOf(
         "blowjob" to "Blowjob",
@@ -238,7 +269,7 @@ class PornTrexProvider : KvsTubeProvider() {
     override val name = "PornTrex"
     override val mainUrl = "https://www.porntrex.com"
     override val description = "Big free HD/4K tube with everything from amateur to studio content. Direct MP4 streams."
-    override val version = 1
+    override val version = 2
 
     override val base = "https://www.porntrex.com"
     override val videoPath = "video"
@@ -264,7 +295,7 @@ class WowXxxProvider : KvsTubeProvider() {
     override val name = "WowXxx"
     override val mainUrl = "https://www.wowxxx.to"
     override val description = "Premium-site porn rehosts (Brazzers, MYLF, KINK, TUSHY…). Direct MP4 streams."
-    override val version = 1
+    override val version = 2
 
     override val base = "https://www.wowxxx.to"
     override val videoPath = "videos"
