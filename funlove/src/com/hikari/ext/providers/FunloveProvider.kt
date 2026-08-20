@@ -33,7 +33,7 @@ class FunloveProvider : HikariProvider {
     override val name = "FunLove"
     override val mainUrl = "https://funlove.info"
     override val description = "Exclusive FC2PPV / JAV from funlove.info — new, popular and top-viewed rows, movies archive and search."
-    override val version = 2
+    override val version = 3
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -132,14 +132,17 @@ class FunloveProvider : HikariProvider {
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
 
-        // 1) The site's own player API (browser headers, device IP).
+        // 1) The site's own player API (browser headers, device IP). The API
+        //    returns several named servers (`sources[]` — e.g. different CDN
+        //    hosts for the same movie); every one is exposed so the player can
+        //    auto-switch if one server rejects seeking.
         val body = HikariNet.getString("$API/iframe-video/$slug", apiHeaders)
         if (body != null) {
-            for (u in extractUrls(body)) {
+            for ((name, u) in extractServers(body)) {
                 if (u.isBlank() || !seen.add(u)) continue
                 out.add(
                     HikariStream(
-                        name = "Stream",
+                        name = name,
                         url = u,
                         headers = mapOf(
                             "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
@@ -161,7 +164,7 @@ class FunloveProvider : HikariProvider {
                 if (h.url.isBlank() || !seen.add(h.url)) continue
                 out.add(
                     HikariStream(
-                        name = "Server",
+                        name = "Server ${out.size + 1}",
                         url = h.url,
                         headers = h.headers,
                         isM3u8 = looksLikeHls(h.url),
@@ -208,66 +211,69 @@ class FunloveProvider : HikariProvider {
     }
 
     /**
-     * Pulls a playable URL out of the iframe-video response body, whatever its
-     * shape: a bare URL string, `data` as string/array, or an object whose
-     * nested string fields carry the URL (possibly as an `<iframe>` tag).
+     * Pulls the playable server list out of the iframe-video response body.
+     * The API returns `data.sources[]` — an array of `{name, file}` server
+     * objects (different CDN hosts for the same movie) plus a default `file`.
+     * Returns (serverName, url) pairs, m3u8 first so the player prefers a
+     * seek-friendly HLS server when the site offers one.
      */
-    private fun extractUrls(body: String): List<String> {
-        val found = LinkedHashSet<String>()
-        val trimmed = body.trim()
-        if (trimmed.startsWith("http") || trimmed.startsWith("//")) {
-            found.add(trimmed)
+    private fun extractServers(body: String): List<Pair<String, String>> {
+        val found = LinkedHashMap<String, String>()
+        fun add(name: String, raw: Any?) {
+            val t = raw.toString().trim()
+            if (t.isBlank() || t.length >= 500 || t.contains("<")) return
+            val u = if (t.startsWith("//")) "https:$t" else t
+            if (u.startsWith("http")) found.putIfAbsent(u, name)
         }
+        val trimmed = body.trim()
+        if (trimmed.startsWith("http") || trimmed.startsWith("//")) add("Server 1", trimmed)
+
         val json = runCatching { JSONObject(body) }.getOrNull()
         if (json != null) {
-            collectJson(json, found)
+            val root = json.optJSONObject("data") ?: json
+            // Named servers first — these are the site's own server buttons.
+            val sources = root.optJSONArray("sources")
+            if (sources != null) {
+                for (i in 0 until sources.length()) {
+                    val s = sources.optJSONObject(i)
+                    if (s == null) continue
+                    val name = s.optString("name").takeIf { it.isNotBlank() } ?: "Server ${i + 1}"
+                    add(name, s.opt("file"))
+                    add(name, s.opt("url"))
+                    add(name, s.opt("src"))
+                }
+            }
+            // Default file + any other url-ish fields.
+            add("Server ${found.size + 1}", root.opt("file"))
+            for (k in urlKeys) {
+                if (!root.has(k)) continue
+                val v = root.opt(k)
+                if (v is String) add("Server ${found.size + 1}", v)
+            }
         } else {
             val arr = runCatching { JSONArray(body) }.getOrNull()
             if (arr != null) {
                 for (i in 0 until arr.length()) {
-                    arr.opt(i)?.let { v -> collectAny(v, found) }
+                    val v = arr.opt(i)
+                    if (v is JSONObject) {
+                        val name = v.optString("name").takeIf { it.isNotBlank() } ?: "Server ${i + 1}"
+                        add(name, v.opt("file"))
+                        add(name, v.opt("url"))
+                    } else {
+                        add("Server ${i + 1}", v)
+                    }
                 }
             }
         }
         // <iframe src="..."> inside any string value.
         val iframe = Regex("""<iframe[^>]*src=["'](https?://[^"']+)""").find(body)?.groupValues?.get(1)
-        if (iframe != null) found.add(iframe)
-        return found.toList()
-    }
+        if (iframe != null) add("Server ${found.size + 1}", iframe)
 
-    private fun collectJson(json: JSONObject, out: MutableSet<String>) {
-        val data = json.opt("data")
-        if (data != null) {
-            collectAny(data, out)
-            return
-        }
-        for (k in urlKeys) {
-            if (!json.has(k)) continue
-            collectAny(json.opt(k), out)
-        }
-    }
-
-    private fun collectAny(v: Any?, out: MutableSet<String>) {
-        when (v) {
-            is String -> collectString(v, out)
-            is JSONArray -> for (i in 0 until v.length()) collectAny(v.opt(i), out)
-            is JSONObject -> {
-                for (k in urlKeys) {
-                    if (v.has(k)) collectAny(v.opt(k), out)
-                }
-                collectJson(v, out)
-            }
-        }
-    }
-
-    private fun collectString(s: String, out: MutableSet<String>) {
-        val t = s.trim()
-        if (t.startsWith("http") && t.length < 500 && !t.contains("<")) {
-            out.add(t)
-            return
-        }
-        val inner = Regex("""src=["'](https?://[^"']+)""").find(t)?.groupValues?.get(1)
-        if (inner != null) out.add(inner)
+        // m3u8 servers first (adaptive + seek-friendly), then the rest.
+        val out = ArrayList<Pair<String, String>>()
+        for ((u, n) in found) if (looksLikeHls(u)) out.add(n to u)
+        for ((u, n) in found) if (!looksLikeHls(u)) out.add(n to u)
+        return out
     }
 
     private fun firstString(o: JSONObject, vararg keys: String): String? {

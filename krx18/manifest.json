@@ -1,6 +1,6 @@
 {
   "name": "Krx18",
-  "version": 2,
+  "version": 3,
   "mainClass": "com.hikari.ext.providers.Krx18Provider",
   "tvTypes": ["movie"]
 }

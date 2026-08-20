@@ -41,7 +41,7 @@ class Krx18Provider : HikariProvider {
     override val mainUrl = "https://krx18.com"
     override val description = "Erotic/JAV movies, DooPlay-powered, with multi-server JWPlayer embeds."
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
-    override val version = 2
+    override val version = 3
 
     companion object {
         private const val BASE = "https://krx18.com"
@@ -201,32 +201,27 @@ class Krx18Provider : HikariProvider {
             ?: return emptyList()
         val iduserEnc = Regex("""const idUser_enc = ["']([0-9a-fA-F]+)["']""").find(page)?.groupValues?.get(1)
             ?: return emptyList()
-        val jwKey = Regex("""jwplayer\.key = "([^"]+)";""").find(page)?.groupValues?.get(1).orEmpty()
-
         val idfile = openSslDecryptHex(idfileEnc, KEY_IDFILE) ?: return emptyList()
         val iduser = openSslDecryptHex(iduserEnc, KEY_IDUSER) ?: return emptyList()
 
-        val jwplayer = JSONObject()
-        if (jwKey.isNotBlank()) jwplayer.put("key", jwKey)
-        jwplayer.put("version", "8.20.1")
-        jwplayer.put("type", "html5")
-
         // Config must serialize in EXACTLY this key order — the API verifies
         // MD5 over the encrypted blob, so the plaintext must match the page's
-        // JSON.stringify order byte for byte.
+        // JSON.stringify order byte for byte (current bundle sends only these
+        // four keys; `domain_play`/`jwplayer` are no longer part of the
+        // playiframe payload, and `platform` falls back to "noplf").
         val config = buildString {
             append("{\"idfile\":\"").append(jsonEscape(idfile)).append("\"")
             append(",\"iduser\":\"").append(jsonEscape(iduser)).append("\"")
-            append(",\"domain_play\":\"https://krx18.com\"")
-            append(",\"platform\":\"\"")
+            append(",\"platform\":\"noplf\"")
             append(",\"hlsSupport\":true")
-            append(",\"jwplayer\":{\"key\":\"").append(jsonEscape(jwplayer.optString("key"))).append("\",\"version\":\"8.20.1\",\"type\":\"html5\"}")
             append("}")
         }
 
-        val encrypted = openSslEncrypt(config.toString(), KEY_CONFIG) ?: return emptyList()
-        val signature = md5Hex(encrypted + MD5_SALT)
-        val body = "data=" + URLEncoder.encode("$encrypted|$signature", "UTF-8")
+        // The page hex-encodes the OpenSSL blob before signing/sending:
+        // `data = hex(Salted__+salt+ct) | md5(hex + MD5_SALT)`.
+        val encryptedHex = openSslEncryptHex(config.toString(), KEY_CONFIG) ?: return emptyList()
+        val signature = md5Hex(encryptedHex + MD5_SALT)
+        val body = "data=" + URLEncoder.encode("$encryptedHex|$signature", "UTF-8")
 
         val origin = runCatching { "https://" + Regex("""https?://([^/]+)""").find(embed)?.groupValues?.get(1) }
             .getOrDefault(embed)
@@ -271,7 +266,11 @@ class Krx18Provider : HikariProvider {
     // ------------------------------------------------------------------
 
     private fun openSslDecryptHex(hex: String, passphrase: String): String? {
-        val raw = hexToBytes(hex) ?: return null
+        var raw = hexToBytes(hex)
+        if (raw == null && hex.startsWith("U2FsdGVkX1")) {
+            raw = runCatching { HikariNet.base64Decode(hex) }.getOrNull()
+        }
+        raw = raw ?: return null
         if (raw.size <= 16) return null
         val keyIv = evpBytesToKey(passphrase, raw.copyOfRange(8, 16))
         return try {
@@ -283,7 +282,7 @@ class Krx18Provider : HikariProvider {
         }
     }
 
-    private fun openSslEncrypt(plain: String, passphrase: String): String? {
+    private fun openSslEncryptHex(plain: String, passphrase: String): String? {
         val salt = ByteArray(8).also { SecureRandom().nextBytes(it) }
         val keyIv = evpBytesToKey(passphrase, salt)
         val ct = try {
@@ -298,7 +297,11 @@ class Krx18Provider : HikariProvider {
         System.arraycopy(magic, 0, out, 0, 8)
         System.arraycopy(salt, 0, out, 8, 8)
         System.arraycopy(ct, 0, out, 16, ct.size)
-        return HikariNet.base64Encode(out)
+        return hexEncode(out)
+    }
+
+    private fun hexEncode(bytes: ByteArray): String = buildString {
+        for (b in bytes) append(String.format("%02x", b))
     }
 
     /** EVP_BytesToKey: MD5-chained passphrase+salt, first 48 bytes → key(32)+iv(16). */

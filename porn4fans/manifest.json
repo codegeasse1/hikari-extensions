@@ -1,0 +1,6 @@
+{
+  "name": "Porn4Fans",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.Porn4fansProvider",
+  "tvTypes": ["movie"]
+}
