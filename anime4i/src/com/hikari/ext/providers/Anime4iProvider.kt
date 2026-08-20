@@ -39,7 +39,7 @@ class Anime4iProvider : HikariProvider {
 
     companion object {
         private const val BASE = "https://anime4i.com"
-        private const val LATEST_URL = "$BASE/anime/?status=&type=&order=update"
+        private val LATEST_URL = "$BASE/anime/?status=&type=&order=update"
         private const val CACHE_TTL_MS = 600_000L
 
         private val htmlCache = HashMap<String, Pair<Long, String>>()
@@ -78,7 +78,7 @@ class Anime4iProvider : HikariProvider {
         add(HikariCatalog("latest", "Latest Episodes", HikariMediaType.SERIES))
         add(HikariCatalog("popular", "Popular Today", HikariMediaType.SERIES))
         for (g in genres) {
-            val label = g.split("-").joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
+            val label = g.split("-").joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
             add(HikariCatalog("genre-$g", label, HikariMediaType.SERIES, rawType = g))
         }
     }
@@ -230,7 +230,7 @@ class Anime4iProvider : HikariProvider {
         }
 
         // Non-Dailymotion embed (backup servers): capture the stream via WebView.
-        return runCatching {
+        return try {
             HikariNet.resolveWithWebView(embedSrc, streamCapture, timeoutMs = 30_000)
                 .map { h ->
                     HikariStream(
@@ -240,7 +240,9 @@ class Anime4iProvider : HikariProvider {
                         isM3u8 = h.url.contains(".m3u8", ignoreCase = true),
                     )
                 }
-        }.getOrDefault(emptyList())
+        } catch (t: Throwable) {
+            emptyList()
+        }
     }
 
     // ------------------------------------------------------------------
@@ -326,7 +328,6 @@ class Anime4iProvider : HikariProvider {
         .let { unescape(it) }
         .replace(Regex("""\s+"""), " ")
         .trim()
-        .takeIf { it.isNotBlank() }
 
     private fun unescape(s: String): String = s
         .replace("&quot;", "\"")
