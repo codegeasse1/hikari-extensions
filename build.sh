@@ -38,7 +38,12 @@ rm -rf build
 mkdir -p build/sdk-out build/ext-out build/dex-out build/pkg
 
 # 1) compile the SDK (interface + net helpers) against stubs → sdk.jar
-"$KOTLINC_DIR/bin/kotlinc" -cp "$CP:deps/android-4.1.1.4.jar" -d build/sdk-out \
+#    -jvm-default=disable: the APP's com.hikari.ext.HikariProvider was compiled
+#    in legacy mode (ships HikariProvider$DefaultImpls, no HikariProvider$-CC).
+#    kotlinc 2.2+ defaults to 'enable' which emits $-CC references, crashing
+#    installs with NoClassDefFoundError — so pin the app's mode here and when
+#    compiling every extension below.
+"$KOTLINC_DIR/bin/kotlinc" -jvm-default=disable -cp "$CP:deps/android-4.1.1.4.jar" -d build/sdk-out \
   sdk/HikariProvider.kt sdk/HikariNet.kt stubs/HttpStub.kt stubs/WebViewResolverStub.kt stubs/HikariAppStub.kt
 jar cf build/sdk.jar -C build/sdk-out .
 
@@ -53,8 +58,9 @@ for dir in */; do
 
   # compile against sdk.jar (coroutines on classpath so suspend helpers +
   # kotlinx.coroutines.sync.Mutex resolve; at runtime the app's classloader
-  # provides kotlinx-coroutines)
-  "$KOTLINC_DIR/bin/kotlinc" -cp "build/sdk.jar:$EXTRA_CP:$CP" -d build/ext-out \
+  # provides kotlinx-coroutines). -jvm-default=disable matches the app's
+  # HikariProvider (see the SDK compile comment above).
+  "$KOTLINC_DIR/bin/kotlinc" -jvm-default=disable -cp "build/sdk.jar:$EXTRA_CP:$CP" -d build/ext-out \
     "$dir"src/com/hikari/ext/providers/*.kt
   jar cf "build/$name.jar" -C build/ext-out .
 
