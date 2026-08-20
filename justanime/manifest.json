@@ -1,6 +1,6 @@
 {
   "name": "JustAnime",
-  "version": 1,
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.JustAnimeProvider",
   "tvTypes": ["series", "movie"]
 }

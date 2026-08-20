@@ -39,7 +39,7 @@ class JustAnimeProvider : HikariProvider {
     override val name = "JustAnime"
     override val mainUrl = "https://justanime.to"
     override val description = "Anime from justanime.to — trending, popular, airing and upcoming rows, full episode lists, sub & dub, direct HLS via the site's own proxy."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
     companion object {
@@ -229,16 +229,11 @@ class JustAnimeProvider : HikariProvider {
             val isM3u8 = s.optBoolean("isM3U8", rawUrl.contains(".m3u8", true))
             val quality = s.optString("quality").takeIf { it.isNotBlank() } ?: "Auto"
             val label = "$lang · $quality"
-            out.add(
-                HikariStream(
-                    name = label,
-                    url = rawUrl,
-                    headers = headers,
-                    subtitles = subtitles,
-                    isM3u8 = isM3u8,
-                )
-            )
-            // Proxy copy — plays even when the CDN hotlink-gates segments.
+            // The site's own player ALWAYS plays through its proxy (the CDNs
+            // hotlink-gate segments and inject ads through it). Put the proxy
+            // copy FIRST so auto-play uses the intended path; the bare CDN URL
+            // is a fallback (some servers' raw manifests are ad-only or
+            // Cloudflare-blocked for direct fetches).
             val proxyBase = servers.firstOrNull { it.first == server }?.second
             if (proxyBase != null) {
                 val headerJson = JSONObject(headers).toString()
@@ -255,6 +250,15 @@ class JustAnimeProvider : HikariProvider {
                     )
                 )
             }
+            out.add(
+                HikariStream(
+                    name = label,
+                    url = rawUrl,
+                    headers = headers,
+                    subtitles = subtitles,
+                    isM3u8 = isM3u8,
+                )
+            )
         }
         return out
     }

@@ -27,8 +27,17 @@ class FkbaeProvider : HikariProvider {
     override val name = "FkBAE"
     override val mainUrl = "https://fkbae.to"
     override val description = "User-uploaded nude videos from Snapchat, Telegram, Instagram & Discord — 20 category walls plus search, with direct HLS streams."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
+
+    /** Browser-ish headers for scraping. fkbae.to (Cloudflare) serves its real
+     *  pages to browsers; the plain okhttp client can get a challenge page on
+     *  the player endpoint instead — so [getCached] goes through
+     *  getStringSmart, which re-fetches in a real WebView when that happens. */
+    private val pageHeaders = mapOf(
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language" to "en-US,en;q=0.9",
+    )
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
@@ -118,8 +127,10 @@ class FkbaeProvider : HikariProvider {
         val fileId = Regex("""snstrhls\.php\?fileid=([A-Za-z0-9]+)""").find(page)?.groupValues?.get(1)
         if (fileId.isNullOrBlank()) return emptyList()
         val player = getCached("$BASE/snstrhls.php?fileid=$fileId") ?: return emptyList()
-        val source = Regex("""<source[^>]*src="([^"]+stream\.fkbae\.to[^"]*)" """")
+        val source = Regex("""<source[^>]*src="([^"]+\.m3u8[^"]*)" """")
             .find(player)?.groupValues?.get(1)?.let { unescapeEntities(it) }
+            ?: Regex("""https://[^\s"'<>]+\.m3u8[^\s"'<>]*""")
+                .find(player)?.groupValues?.get(0)?.let { unescapeEntities(it) }
         if (source.isNullOrBlank()) return emptyList()
         return listOf(
             HikariStream(
@@ -182,7 +193,10 @@ class FkbaeProvider : HikariProvider {
                 if (now - t < CACHE_TTL_MS) return html
             }
         }
-        val html = HikariNet.getString(url) ?: return null
+        // getStringSmart: plain okhttp first; if the CDN answers with a
+        // challenge page (or refuses entirely) it re-fetches in a real WebView
+        // and returns the rendered HTML — the same browser that fkbae.to serves.
+        val html = HikariNet.getStringSmart(url, pageHeaders) ?: return null
         cacheMutex.withLock {
             if (htmlCache.size > 40) htmlCache.clear()
             htmlCache[url] = now to html
