@@ -39,7 +39,7 @@ class MissavProvider : HikariProvider {
     override val description = "Free JAV — new releases, hot today, uncensored leaks and 100k+ genre videos."
     override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
-    override val version = 3
+    override val version = 4
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
@@ -207,20 +207,33 @@ class MissavProvider : HikariProvider {
 
     /** Extracts the video-card grid from a browse/search page. */
     private fun parseCards(html: String): List<HikariMedia> {
-        val re = Regex(
-            """class="text-secondary group-hover:text-primary"\s*href="https://missav\.ws/en/([^"?#]+)"[^>]*>\s*([\s\S]*?)\s*</a>"""
+        // Card blocks: <div class="thumbnail group"> … </div></div>. MissAV
+        // now serves result-card links behind CDN-group prefixes
+        // (https://missav.ws/dm14/en/<id>) alongside the plain /en/<id> form,
+        // so the link accepts an optional <group>/ segment. Posters are taken
+        // from the card's own lazy-loaded <img data-src="…cover-t.jpg"> instead
+        // of being reconstructed from the CDN root.
+        val cardRe = Regex(
+            """class="thumbnail group"[\s\S]*?</div>\s*</div>"""
+        )
+        val posterRe = Regex("""class="lozad w-full"\s*data-src="([^"]*)"""")
+        val linkRe = Regex(
+            """class="text-secondary group-hover:text-primary"\s*href="https://missav\.ws/(?:[a-z0-9]+/)?en/([^"?#]+)"[^>]*>\s*([\s\S]*?)\s*</a>"""
         )
         val out = LinkedHashMap<String, HikariMedia>()
-        for (m in re.findAll(html)) {
-            val id = m.groupValues[1]
+        for (card in cardRe.findAll(html)) {
+            val block = card.value
+            val link = linkRe.find(block) ?: continue
+            val id = link.groupValues[1]
             if (!Regex("^[a-z0-9-]+$").matches(id)) continue
-            val title = unescapeEntities(m.groupValues[2]).trim()
+            val title = unescapeEntities(link.groupValues[2]).trim()
             if (title.isBlank()) continue
+            val poster = posterRe.find(block)?.groupValues?.get(1)
             out[id] = HikariMedia(
                 id = id,
                 title = title,
                 type = HikariMediaType.MOVIE,
-                posterUrl = "$CDN/$id/cover-t.jpg",
+                posterUrl = poster ?: "$CDN/$id/cover-t.jpg",
             )
         }
         return out.values.toList()

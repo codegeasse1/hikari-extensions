@@ -189,7 +189,19 @@ abstract class Cs3BridgeProvider(
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> =
         withContext(Dispatchers.IO) {
             val a = api ?: return@withContext emptyList()
-            val data = episode?.id ?: media.id
+            // For SERIES, the plugin's per-episode data string lives on the
+            // episode and is already in episode.id. For MOVIES the provider
+            // serialized its source list into MovieLoadResponse.dataUrl during
+            // load() (MoviesMod/VegaMovies: `[{"source":"…"}]`, re-parsed by
+            // loadLinks via parseJson). Handing loadLinks the plain page URL
+            // makes those providers throw Jackson's "Unrecognized token
+            // 'https'" — pass the response's data string like CloudStream does.
+            val movieData = if (episode == null) {
+                (loadResponse(media.id) as? MovieLoadResponse)
+                    ?.dataUrl
+                    ?.takeIf { it.isNotBlank() }
+            } else null
+            val data = if (episode != null) episode.id else movieData ?: media.id
             val subs = mutableListOf<SubtitleFile>()
             val links = mutableListOf<ExtractorLink>()
 
