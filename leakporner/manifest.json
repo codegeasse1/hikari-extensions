@@ -1,0 +1,6 @@
+{
+  "name": "LeakPorner",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.LeakPornerProvider",
+  "tvTypes": ["movie"]
+}
