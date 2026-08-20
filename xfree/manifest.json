@@ -1,0 +1,6 @@
+{
+  "name": "XFree",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.XFreeProvider",
+  "tvTypes": ["movie"]
+}
