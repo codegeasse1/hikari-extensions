@@ -1,0 +1,6 @@
+{
+  "name": "Anime",
+  "version": 1,
+  "mainClass": ["com.hikari.ext.providers.AnimeAniKoto","com.hikari.ext.providers.AnimeAnikage","com.hikari.ext.providers.AnimeAnimekhor","com.hikari.ext.providers.AnimeAnimexin","com.hikari.ext.providers.AnimeAnineko"],
+  "tvTypes": ["movie","tv"]
+}
