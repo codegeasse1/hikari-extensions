@@ -17,8 +17,9 @@ import java.net.URLEncoder
  *  - 20 category walls (`/snapchat-nudes/`, `/leaked-snapchat/`, …) plus the
  *    home feed, all paginated with `/page/N/`,
  *  - a post page embeds `<iframe src="/snstrhls.php?fileid=…">`, which serves
- *    the HLS playlist (`stream.fkbae.to/hls/<fileid>.m3u8?token=…&expires=…`)
- *    directly in a `<source>` tag — no WebView needed,
+ *    a single `<source>` — the HLS playlist for HLS posts, a direct
+ *    `stream.fkbae.to/<id>.mp4` file for the rest (both signed with
+ *    `?token=…&expires=…`), so no WebView needed,
  *  - search is WordPress `/?s=<query>` (also paginated with `/page/N/`).
  */
 class FkbaeProvider : HikariProvider {
@@ -26,8 +27,8 @@ class FkbaeProvider : HikariProvider {
     override val id = "fkbae"
     override val name = "FkBAE"
     override val mainUrl = "https://fkbae.to"
-    override val description = "User-uploaded nude videos from Snapchat, Telegram, Instagram & Discord — 20 category walls plus search, with direct HLS streams."
-    override val version = 2
+    override val description = "User-uploaded nude videos from Snapchat, Telegram, Instagram & Discord — 20 category walls plus search, with direct HLS & MP4 streams."
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     /** Browser-ish headers for scraping. fkbae.to (Cloudflare) serves its real
@@ -127,17 +128,21 @@ class FkbaeProvider : HikariProvider {
         val fileId = Regex("""snstrhls\.php\?fileid=([A-Za-z0-9]+)""").find(page)?.groupValues?.get(1)
         if (fileId.isNullOrBlank()) return emptyList()
         val player = getCached("$BASE/snstrhls.php?fileid=$fileId") ?: return emptyList()
-        val source = Regex("""<source[^>]*src="([^"]+\.m3u8[^"]*)" """")
+        // The player page serves exactly one <source>: an m3u8 playlist for
+        // HLS posts, a direct stream.fkbae.to/<id>.mp4 for the rest. Grab
+        // whichever it is (generic src match + an m3u8/mp4 URL fallback).
+        val source = Regex("""<source[^>]*src="(https://[^"]+)"""")
             .find(player)?.groupValues?.get(1)?.let { unescapeEntities(it) }
-            ?: Regex("""https://[^\s"'<>]+\.m3u8[^\s"'<>]*""")
+            ?: Regex("""https://[^\s"'<>]+\.(?:m3u8|mp4)[^\s"'<>]*""")
                 .find(player)?.groupValues?.get(0)?.let { unescapeEntities(it) }
         if (source.isNullOrBlank()) return emptyList()
+        val isHls = source.contains(".m3u8", ignoreCase = true)
         return listOf(
             HikariStream(
-                name = "HLS",
+                name = if (isHls) "HLS" else "MP4",
                 url = source,
                 headers = emptyMap(),
-                isM3u8 = true,
+                isM3u8 = isHls,
             )
         )
     }
