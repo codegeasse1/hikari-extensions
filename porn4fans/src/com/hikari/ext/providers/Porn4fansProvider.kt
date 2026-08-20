@@ -182,7 +182,7 @@ class Porn4fansProvider : HikariProvider {
             if (!url.startsWith("http")) continue
             if (url.contains("login-required") || !url.contains("/get_file/")) continue
             // video_alt_url2_text labels video_alt_url2, etc.
-            val label = texts[key + "_text"].takeIf { it.isNotBlank() }
+            val label = texts[key + "_text"]?.takeIf { it.isNotBlank() }
                 ?: when {
                     key == "video_url" -> "480p"
                     key == "video_alt_url" -> "720p"
