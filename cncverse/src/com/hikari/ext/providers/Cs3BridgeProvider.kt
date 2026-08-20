@@ -1,3 +1,5 @@
+@file:OptIn(com.lagradost.cloudstream3.InternalAPI::class)
+
 package com.hikari.ext.providers
 
 import android.content.Context
@@ -27,7 +29,6 @@ import com.lagradost.cloudstream3.TvSeriesSearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.plugins.BasePlugin
 import com.lagradost.cloudstream3.plugins.Plugin
-import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import kotlinx.coroutines.CancellationException
@@ -197,27 +198,22 @@ abstract class Cs3BridgeProvider(
             val started = System.currentTimeMillis()
             var completed: Boolean? = null
 
+            // loadLinks is a suspend function running plugin code; run it on
+            // this IO thread inside a bounded coroutine — withTimeoutOrNull
+            // cancels a hung provider instead of leaking a thread. (The app's
+            // native CS3 path uses a detached scope to return early; here the
+            // provider is the ONLY source engine, so we just wait it out.)
             fun runOnce(budgetMs: Long) {
                 links.clear()
                 subs.clear()
-                val worker = Thread {
-                    try {
-                        completed = a.loadLinks(data, false, { subs.add(it) }, { links.add(it) })
+                kotlinx.coroutines.runBlocking {
+                    completed = try {
+                        withTimeoutOrNull(budgetMs) {
+                            a.loadLinks(data, false, { subs.add(it) }, { links.add(it) })
+                        }
                     } catch (t: Throwable) {
-                        completed = false
+                        false
                     }
-                }
-                worker.start()
-                try {
-                    worker.join(budgetMs)
-                } catch (e: InterruptedException) {
-                    // ignore
-                }
-                if (worker.isAlive) {
-                    // A hung provider can't be force-stopped from here; stop
-                    // waiting and play what we have. The thread drains in the
-                    // background (same behavior as the app's native path).
-                    try { worker.interrupt() } catch (t: Throwable) { }
                 }
             }
 
@@ -316,6 +312,95 @@ abstract class Cs3BridgeProvider(
 
         private fun loadedCs3(ctx: Context, file: File): List<MainAPI> =
             loadedPlugins.computeIfAbsent(file.absolutePath) { loadCs3(ctx, file) }
+
+        /**
+         * Loads a .cs3 archive the same way the app's Cs3PluginManager does:
+         * read-only file (Android 14+ refuses writable dex), PathClassLoader on
+         * the archive, manifest.json -> plugin class, instantiate + load(), then
+         * collect the MainAPIs the plugin registered in the shared APIHolder.
+         */
+        private fun loadCs3(ctx: Context, file: File): List<MainAPI> {
+            val path = file.absolutePath
+            return try {
+                try {
+                    file.setReadOnly()
+                } catch (t: Throwable) {
+                    // not fatal
+                }
+                val classLoader = dalvik.system.PathClassLoader(path, ctx.classLoader)
+                val manifestText = classLoader.getResourceAsStream("manifest.json")?.use {
+                    InputStreamReader(it).readText()
+                } ?: return emptyList()
+                val root = org.json.JSONObject(manifestText)
+                val pluginClassName = root.optString("pluginClassName").takeIf { it.isNotBlank() }
+                    ?: root.optString("pluginClass").takeIf { it.isNotBlank() }
+                    ?: return emptyList()
+                val requiresResources = root.optBoolean("requiresResources", false)
+                @Suppress("UNCHECKED_CAST")
+                val instance = (classLoader.loadClass(pluginClassName) as Class<out BasePlugin>)
+                    .getDeclaredConstructor().newInstance()
+                try {
+                    APIHolder.allProviders.removeAll { it.sourcePlugin == path }
+                } catch (t: Throwable) {
+                    // not fatal
+                }
+                instance.filename = path
+                if (requiresResources) {
+                    try {
+                        val assets = AssetManager::class.java.getDeclaredConstructor().newInstance()
+                        val addPath = AssetManager::class.java.getMethod("addAssetPath", String::class.java)
+                        addPath.invoke(assets, path)
+                        @Suppress("DEPRECATION")
+                        (instance as? Plugin)?.resources = Resources(
+                            assets as AssetManager,
+                            ctx.resources.displayMetrics,
+                            ctx.resources.configuration
+                        )
+                    } catch (t: Throwable) {
+                        // not fatal
+                    }
+                }
+                if (instance is Plugin) {
+                    instance.load(HikariApp.mainActivity ?: ctx)
+                } else {
+                    instance.load()
+                }
+                val apis = try {
+                    APIHolder.allProviders.filter { it.sourcePlugin == path }
+                } catch (t: Throwable) {
+                    emptyList()
+                }
+                // Some plugins read the app off their providers (e.g. `MainAPI.app`)
+                // after load. The real CloudStream host sets it to the activity —
+                // mirror that, locating the field wherever the jar puts it (instance
+                // member, companion, or a provider subclass override).
+                HikariApp.mainActivity?.let { activity ->
+                    apis.forEach { api ->
+                        runCatching {
+                            var done = false
+                            var c: Class<*>? = api.javaClass
+                            while (c != null && !done) {
+                                runCatching { c.getField("app").set(api, activity); done = true }
+                                if (!done) runCatching {
+                                    c.getDeclaredField("app").apply { isAccessible = true }
+                                        .set(api, activity); done = true
+                                }
+                                c = c.superclass
+                            }
+                            if (!done) {
+                                runCatching {
+                                    val holder = api.javaClass.getField("Companion").get(null)
+                                    holder.javaClass.getField("app").set(holder, activity)
+                                }
+                            }
+                        }
+                    }
+                }
+                apis
+            } catch (t: Throwable) {
+                emptyList()
+            }
+        }
     }
 
     /** The app's MainActivity when present (plugins cast it as AppCompatActivity),
@@ -346,90 +431,6 @@ abstract class Cs3BridgeProvider(
         null
     }
 
-    /**
-     * Loads a .cs3 archive the same way the app's Cs3PluginManager does:
-     * read-only file (Android 14+ refuses writable dex), PathClassLoader on
-     * the archive, manifest.json -> plugin class, instantiate + load(), then
-     * collect the MainAPIs the plugin registered in the shared APIHolder.
-     */
-    private fun loadCs3(ctx: Context, file: File): List<MainAPI> {
-        val path = file.absolutePath
-        return try {
-            try {
-                file.setReadOnly()
-            } catch (t: Throwable) {
-                // not fatal
-            }
-            val classLoader = dalvik.system.PathClassLoader(path, ctx.classLoader)
-            val manifest = classLoader.getResourceAsStream("manifest.json")?.use {
-                AppUtils.parseJson(InputStreamReader(it).readText(), BasePlugin.Manifest::class)
-            } ?: return emptyList()
-            @Suppress("UNCHECKED_CAST")
-            val instance = (classLoader.loadClass(manifest.pluginClassName) as Class<out BasePlugin>)
-                .getDeclaredConstructor().newInstance()
-            try {
-                APIHolder.allProviders.removeAll { it.sourcePlugin == path }
-            } catch (t: Throwable) {
-                // not fatal
-            }
-            instance.filename = path
-            if (manifest.requiresResources) {
-                try {
-                    val assets = AssetManager::class.java.getDeclaredConstructor().newInstance()
-                    val addPath = AssetManager::class.java.getMethod("addAssetPath", String::class.java)
-                    addPath.invoke(assets, path)
-                    @Suppress("DEPRECATION")
-                    (instance as? Plugin)?.resources = Resources(
-                        assets as AssetManager,
-                        ctx.resources.displayMetrics,
-                        ctx.resources.configuration
-                    )
-                } catch (t: Throwable) {
-                    // not fatal
-                }
-            }
-            if (instance is Plugin) {
-                instance.load(HikariApp.mainActivity ?: ctx)
-            } else {
-                instance.load()
-            }
-            val apis = try {
-                APIHolder.allProviders.filter { it.sourcePlugin == path }
-            } catch (t: Throwable) {
-                emptyList()
-            }
-            // Some plugins read the app off their providers (e.g. `MainAPI.app`)
-            // after load. The real CloudStream host sets it to the activity —
-            // mirror that, locating the field wherever the jar puts it (instance
-            // member, companion, or a provider subclass override).
-            HikariApp.mainActivity?.let { activity ->
-                apis.forEach { api ->
-                    runCatching {
-                        var done = false
-                        var c: Class<*>? = api.javaClass
-                        while (c != null && !done) {
-                            runCatching { c.getField("app").set(api, activity); done = true }
-                            if (!done) runCatching {
-                                c.getDeclaredField("app").apply { isAccessible = true }
-                                    .set(api, activity); done = true
-                            }
-                            c = c.superclass
-                        }
-                        if (!done) {
-                            runCatching {
-                                val holder = api.javaClass.getField("Companion").get(null)
-                                holder.javaClass.getField("app").set(holder, activity)
-                            }
-                        }
-                    }
-                }
-            }
-            apis
-        } catch (t: Throwable) {
-            emptyList()
-        }
-    }
-
     // ------------------------------------------------------------------- helpers
 
     private suspend fun loadResponse(id: String): LoadResponse? {
@@ -452,7 +453,7 @@ abstract class Cs3BridgeProvider(
         return r
     }
 
-    private fun tryLoad(a: MainAPI, id: String): LoadResponse? = try {
+    private suspend fun tryLoad(a: MainAPI, id: String): LoadResponse? = try {
         a.load(id)
     } catch (t: Throwable) {
         null
