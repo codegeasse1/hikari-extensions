@@ -154,12 +154,34 @@ abstract class Cs3BridgeProvider(
     override suspend fun search(query: String, page: Int): List<HikariMedia> =
         withContext(Dispatchers.IO) {
             val a = api() ?: return@withContext emptyList()
-            try {
-                a.search(query).orEmpty().mapNotNull { it.toMedia() }
+            val found = try {
+                searchItems(a, query, page)
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                emptyList()
+                // A brand-new plugin instance can fail its very first network
+                // call while the runtime initializes — retry once.
+                try {
+                    searchItems(a, query, page)
+                } catch (t2: Throwable) {
+                    if (t2 is CancellationException) throw t2
+                    emptyList()
+                }
             }
+            found.mapNotNull { it.toMedia() }
+        }
+
+    /** Modern plugins override the paginated `search(query, page)` — the plain
+     *  `search(query)` overload throws NotImplementedError for them, which made
+     *  Hikari search return nothing for those providers while CloudStream
+     *  worked. Old-style plugins override `search(query)` and the base
+     *  `search(query, page)` delegates to it, so the paginated form is correct
+     *  for BOTH generations. */
+    private suspend fun searchItems(a: MainAPI, query: String, page: Int): List<SearchResponse> =
+        try {
+            a.search(query, page)?.items.orEmpty()
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            a.search(query).orEmpty()
         }
 
     // --------------------------------------------------------------------- meta
