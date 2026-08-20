@@ -16,10 +16,10 @@ import java.net.URLEncoder
  * Instagram and Discord. A WordPress site, scraped from its rendered pages:
  *  - 20 category walls (`/snapchat-nudes/`, `/leaked-snapchat/`, …) plus the
  *    home feed, all paginated with `/page/N/`,
- *  - a post page embeds `<iframe src="/snstrhls.php?fileid=…">`, which serves
- *    a single `<source>` — the HLS playlist for HLS posts, a direct
- *    `stream.fkbae.to/<id>.mp4` file for the rest (both signed with
- *    `?token=…&expires=…`), so no WebView needed,
+ *  - a post page embeds the player iframe — `snstrhls.php` (fluid player, an
+ *    HLS `<source>`) for HLS posts, or `snstr.php` (JWPlayer, `file:"…"`) for
+ *    direct-`stream.fkbae.to/<id>.mp4` posts. Both streams are signed with
+ *    `?token=…&expires=…` and play headerless, so no WebView needed,
  *  - search is WordPress `/?s=<query>` (also paginated with `/page/N/`).
  */
 class FkbaeProvider : HikariProvider {
@@ -28,7 +28,7 @@ class FkbaeProvider : HikariProvider {
     override val name = "FkBAE"
     override val mainUrl = "https://fkbae.to"
     override val description = "User-uploaded nude videos from Snapchat, Telegram, Instagram & Discord — 20 category walls plus search, with direct HLS & MP4 streams."
-    override val version = 3
+    override val version = 4
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     /** Browser-ish headers for scraping. fkbae.to (Cloudflare) serves its real
@@ -125,16 +125,27 @@ class FkbaeProvider : HikariProvider {
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val page = getCached("$BASE/${media.id}/") ?: return emptyList()
-        val fileId = Regex("""snstrhls\.php\?fileid=([A-Za-z0-9]+)""").find(page)?.groupValues?.get(1)
-        if (fileId.isNullOrBlank()) return emptyList()
-        val player = getCached("$BASE/snstrhls.php?fileid=$fileId") ?: return emptyList()
-        // The player page serves exactly one <source>: an m3u8 playlist for
-        // HLS posts, a direct stream.fkbae.to/<id>.mp4 for the rest. Grab
-        // whichever it is (generic src match + an m3u8/mp4 URL fallback).
+        // The post embeds the player iframe: snstrhls.php (fluid player, an
+        // HLS <source>) for HLS posts, snstr.php (JWPlayer, file:"…") for the
+        // direct-MP4 posts — grab whichever one this post uses.
+        val playerUrl = Regex("""<iframe[^>]*src="([^"]*snstr(?:hls)?\.php\?fileid=[A-Za-z0-9]+)""")
+            .find(page)?.groupValues?.get(1)
+            ?.let { if (it.startsWith("http")) it else "$BASE$it" }
+        if (playerUrl.isNullOrBlank()) return emptyList()
+        val player = getCached(playerUrl) ?: return emptyList()
+        // The player page serves exactly one source: an m3u8 playlist (fluid
+        // player <source>) for HLS posts, a direct stream.fkbae.to/<id>.mp4
+        // (JWPlayer file:"…") for the rest. Grab whichever it is, with a
+        // generic https URL fallback for anything else.
         val source = Regex("""<source[^>]*src="(https://[^"]+)"""")
-            .find(player)?.groupValues?.get(1)?.let { unescapeEntities(it) }
+            .find(player)?.groupValues?.get(1)
+            ?.let { unescapeEntities(it) }
+            ?: Regex("""file\s*:\s*"(https://[^"]+)"""")
+                .find(player)?.groupValues?.get(1)
+                ?.let { unescapeEntities(it) }
             ?: Regex("""https://[^\s"'<>]+\.(?:m3u8|mp4)[^\s"'<>]*""")
-                .find(player)?.groupValues?.get(0)?.let { unescapeEntities(it) }
+                .find(player)?.groupValues?.get(0)
+                ?.let { unescapeEntities(it) }
         if (source.isNullOrBlank()) return emptyList()
         val isHls = source.contains(".m3u8", ignoreCase = true)
         return listOf(

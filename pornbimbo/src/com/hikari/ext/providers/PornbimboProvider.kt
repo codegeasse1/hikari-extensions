@@ -17,16 +17,13 @@ import java.net.URLEncoder
  *  - Listing pages (`/latest-updates/`, `/most-popular/`, `/categories/<slug>/`,
  *    `/search/<query>/`) are plain HTML grids of `class="item"` cards whose
  *    links are `/video/<id>/<slug>` and posters live under
- *    `…/videos_screenshots/<prefix>/<id>/<size>/1.jpg` (sizes like 180x135;
- *    swapping in 640x480 gives the big poster),
- *  - a video page embeds a `flashvars` object with signed direct MP4 URLs:
- *    `video_url` (the 720p copy) and `event_reporting2` (the base copy), both
- *    served by `/get_file/<hash>/…/71990_720p.mp4/?v-acctoken=…` — the token
- *    is time- and IP-bound but self-contained, so the parsed URL plays as-is
- *    from the same device that fetched the page,
- *  - `/get_file` is hotlink-gated: KVS wants the site as Referer OR the
- *    `279e7`/`279e7b` cookies the page's inline JS sets (the `noref` anti-
- *    hotlink allowance). The stream carries both, so direct playback works.
+ *    `…/videos_screenshots/<prefix>/<id>/180x135/1.jpg` (the only thumbnail
+ *    size this site generates — bigger sizes 404),
+ *  - an embed page (`/embed/<id>`) carries a `flashvars` object with signed
+ *    direct MP4 URLs: `video_url` (the 720p copy) and `event_reporting2` (the
+ *    base copy), both served by `/get_file/<hash>/…/<id>_720p.mp4/?v-acctoken=…`
+ *    — the token is time-bound but self-contained (no Referer/cookie gate),
+ *    so the parsed URL plays as-is from the same device that fetched the page.
  */
 class PornbimboProvider : HikariProvider {
 
@@ -35,7 +32,7 @@ class PornbimboProvider : HikariProvider {
     override val mainUrl = "https://pornbimbo.com"
     override val description = "Kinky fetish tube — JOI/CEI, femdom, mommy taboo, sissy and more. Direct MP4 streams."
     override val tvTypes = setOf(HikariMediaType.MOVIE)
-    override val version = 1
+    override val version = 2
 
     companion object {
         private const val BASE = "https://pornbimbo.com"
@@ -80,11 +77,11 @@ class PornbimboProvider : HikariProvider {
     }
 
     // ------------------------------------------------------------------
-    //  Meta + streams (from the video page)
+    //  Meta + streams (from the embed page)
     // ------------------------------------------------------------------
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
-        val page = getCached(videoUrl(media.id)) ?: return media
+        val page = getCached(embedUrl(media.id)) ?: return media
         val fv = flashvarsBlock(page)
         val title = fv?.let { flashvarString(it, "video_title") }
             ?.takeIf { it.isNotBlank() }
@@ -99,9 +96,10 @@ class PornbimboProvider : HikariProvider {
                 ?.map { it.trim() }
                 ?.filter { it.isNotBlank() }?.let { addAll(it) }
         }.distinct()
-        val overview = metaProperty(page, "og:description")?.let { unescapeEntities(it) }
-            ?.takeIf { it.isNotBlank() && !it.contains("KVS") }
-        val poster = metaProperty(page, "og:image")?.takeIf { it.startsWith("http") }
+        val overview = metaName(page, "description")?.let { unescapeEntities(it) }
+            ?.takeIf { it.isNotBlank() }
+        val poster = fv?.let { flashvarString(it, "preview_url") }
+            ?.takeIf { it.startsWith("http") }
             ?: media.posterUrl
         return media.copy(
             title = title,
@@ -114,9 +112,8 @@ class PornbimboProvider : HikariProvider {
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val id = media.id.trim()
         if (!id.all { it.isDigit() }) return emptyList()
-        val page = getCached(videoUrl(id)) ?: return emptyList()
+        val page = getCached(embedUrl(id)) ?: return emptyList()
         val fv = flashvarsBlock(page) ?: return emptyList()
-        val headers = streamHeaders(page)
         val out = ArrayList<HikariStream>()
         flashvarString(fv, "video_url")
             ?.takeIf { it.startsWith("http") && it.contains("/get_file/") }
@@ -125,7 +122,7 @@ class PornbimboProvider : HikariProvider {
                     HikariStream(
                         name = "720p",
                         url = url,
-                        headers = headers,
+                        headers = emptyMap(),
                         isM3u8 = url.contains(".m3u8", ignoreCase = true),
                     )
                 )
@@ -137,7 +134,7 @@ class PornbimboProvider : HikariProvider {
                     HikariStream(
                         name = if (out.isEmpty()) "Video" else "SD",
                         url = url,
-                        headers = headers,
+                        headers = emptyMap(),
                         isM3u8 = url.contains(".m3u8", ignoreCase = true),
                     )
                 )
@@ -149,7 +146,10 @@ class PornbimboProvider : HikariProvider {
     //  HTML helpers
     // ------------------------------------------------------------------
 
-    private fun videoUrl(id: String): String = "$BASE/video/$id/"
+    /** The id-only embed page — carries the same flashvars as the video page
+     *  but needs no slug, so it works even when a media item came from search,
+     *  favorites or watch history (which lose the catalog link). */
+    private fun embedUrl(id: String): String = "$BASE/embed/$id"
 
     /** Fetches an HTML page once per CACHE_TTL_MS. */
     private suspend fun getCached(url: String): String? {
@@ -186,8 +186,9 @@ class PornbimboProvider : HikariProvider {
                     ?.let { unescapeEntities(it).trim() } ?: ""
             }
             if (title.isBlank()) continue
+            // KVS only generates the 180x135 screenshot for these videos —
+            // larger sizes (640x480 etc.) 404, so keep the URL as served.
             val poster = posterRe.find(block)?.groupValues?.get(1)
-                ?.replace("180x135", "640x480")
                 ?.takeIf { it.startsWith("http") }
             out[id] = HikariMedia(
                 id = id,
@@ -212,22 +213,8 @@ class PornbimboProvider : HikariProvider {
     private fun flashvarString(flashvars: String, key: String): String? =
         Regex("""\b$key:\s*'([^']*)'""").find(flashvars)?.groupValues?.get(1)
 
-    /**
-     * Headers the direct /get_file MP4 needs: a site Referer (KVS hotlink
-     * gate) plus the noreferrer-allowance cookies the page's inline JS sets
-     * (`279e7` is a static base64 blob; `279e7b` is a fresh unix timestamp).
-     */
-    private fun streamHeaders(page: String): Map<String, String> {
-        val headers = mutableMapOf("Referer" to "$BASE/")
-        Regex("""document\.cookie='279e7=([^;]+)""").find(page)?.let { m ->
-            val now = System.currentTimeMillis() / 1000
-            headers["Cookie"] = "279e7=${m.groupValues[1]}; 279e7b=$now"
-        }
-        return headers
-    }
-
-    private fun metaProperty(html: String, prop: String): String? =
-        Regex("""<meta\s+property="$prop"\s+content="([^"]*)""")
+    private fun metaName(html: String, name: String): String? =
+        Regex("""<meta\s+name="$name"\s+content="([^"]*)""")
             .find(html)?.groupValues?.get(1)
 
     private fun unescapeEntities(s: String): String = s
