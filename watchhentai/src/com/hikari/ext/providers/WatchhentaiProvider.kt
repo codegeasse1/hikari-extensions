@@ -34,8 +34,6 @@ class WatchhentaiProvider : HikariProvider {
     override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE, HikariMediaType.SERIES)
 
-    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
-
     companion object {
         private const val BASE = "https://watchhentai.net"
         private const val CACHE_TTL_MS = 600_000L
