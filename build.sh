@@ -59,11 +59,12 @@ for dir in */; do
   jar cf "build/$name.jar" -C build/ext-out .
 
   # dex the extension (SDK + CloudStream + android classes stay external refs)
+  cp_args=(--classpath build/sdk.jar)
+  IFS=':' read -ra _cps <<< "$EXTRA_CP:$CP"
+  for c in "${_cps[@]}"; do cp_args+=(--classpath "$c"); done
   java -cp deps/r8-8.3.37.jar com.android.tools.r8.D8 --release \
     --lib deps/android-4.1.1.4.jar \
-    --classpath build/sdk.jar \
-    --classpath $EXTRA_CP \
-    --classpath $CP \
+    "${cp_args[@]}" \
     --output build/dex-out "build/$name.jar"
 
   # package .hiki = classes.dex + manifest.json + any bundled resources
