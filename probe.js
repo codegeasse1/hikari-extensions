@@ -10,18 +10,20 @@ const fs = require('fs');
   });
   const page = await ctx.newPage();
   await page.goto('https://justanime.to/', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(5000);
+  console.log('PAGE_URL:', page.url());
+  console.log('PAGE_TITLE:', await page.title());
+  const bodyLen = (await page.content()).length;
+  console.log('BODY_LEN:', bodyLen);
 
   const API = 'https://core.justanime.to/api';
   async function probe(name, url) {
     try {
-      const text = await page.evaluate(async (u) => {
-        const r = await fetch(u, { credentials: 'omit' });
-        return { status: r.status, body: await r.text() };
-      }, url);
-      fs.writeFileSync('probes/' + name, text.body);
-      console.log(name, '->', text.status, text.body.length);
-      return JSON.parse(text.body);
+      const r = await ctx.request.get(url, { timeout: 30000 });
+      const text = await r.text();
+      fs.writeFileSync('probes/' + name, text);
+      console.log(name, '->', r.status(), text.length);
+      return JSON.parse(text);
     } catch (e) {
       console.log(name, 'ERROR', e.message);
       return null;
@@ -40,7 +42,7 @@ const fs = require('fs');
       return '';
     }
     id = walk(home);
-    console.log('first anime id:', id);
+    console.log('FIRST_ANIME_ID:', id);
   }
   if (id) {
     await probe('anime.json', API + '/anime/' + id);
