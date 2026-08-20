@@ -1,0 +1,24 @@
+name: Probe3
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl probe
+        run: |
+          mkdir -p probes
+          curl -sS "https://core.justanime.to/api/home" -H "Origin: https://justanime.to" -o probes/home.json || echo "CURL FAILED"
+          wc -c probes/home.json
+          head -c 800 probes/home.json
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: probes
+          path: probes/
