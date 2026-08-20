@@ -33,7 +33,7 @@ class FunloveProvider : HikariProvider {
     override val name = "FunLove"
     override val mainUrl = "https://funlove.info"
     override val description = "Exclusive FC2PPV / JAV from funlove.info — new, popular and top-viewed rows, movies archive and search."
-    override val version = 1
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -128,6 +128,7 @@ class FunloveProvider : HikariProvider {
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val slug = media.id.takeIf { it.isNotBlank() } ?: return emptyList()
+        val watchPage = "$SITE/video-iframe/$slug"
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
 
@@ -142,36 +143,41 @@ class FunloveProvider : HikariProvider {
                         url = u,
                         headers = mapOf(
                             "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
-                            "Referer" to "$SITE/",
+                            "Referer" to watchPage,
+                            "Origin" to SITE,
                         ),
-                        isM3u8 = u.contains(".m3u8", ignoreCase = true),
+                        isM3u8 = looksLikeHls(u),
                     )
                 )
             }
         }
 
-        // 2) Fallback: run the site's own watch page in a WebView and capture
-        //    the video request it makes.
-        if (out.isEmpty()) {
-            try {
-                val hits = HikariNet.resolveWithWebView("$SITE/video-iframe/$slug", streamCapture, timeoutMs = 45_000)
-                for (h in hits) {
-                    if (h.url.isBlank() || !seen.add(h.url)) continue
-                    out.add(
-                        HikariStream(
-                            name = "Server",
-                            url = h.url,
-                            headers = h.headers,
-                            isM3u8 = h.url.contains(".m3u8", ignoreCase = true),
-                        )
+        // 2) Also run the site's own watch page in a WebView and capture the
+        //    video request it makes — an alternative server if the API URL's
+        //    CDN is picky about seeking.
+        try {
+            val hits = HikariNet.resolveWithWebView(watchPage, streamCapture, timeoutMs = 45_000)
+            for (h in hits) {
+                if (h.url.isBlank() || !seen.add(h.url)) continue
+                out.add(
+                    HikariStream(
+                        name = "Server",
+                        url = h.url,
+                        headers = h.headers,
+                        isM3u8 = looksLikeHls(h.url),
                     )
-                }
-            } catch (t: Throwable) {
-                // ignore — nothing else to try
+                )
             }
+        } catch (t: Throwable) {
+            // ignore — the API streams (if any) are still usable
         }
         return out
     }
+
+    /** HLS detection beyond the obvious extension (some CDNs serve HLS without
+     *  a `.m3u8` in the URL path, which the progressive player would choke on). */
+    private fun looksLikeHls(u: String): Boolean =
+        u.contains(".m3u8", ignoreCase = true) || u.contains("m3u8", ignoreCase = true)
 
     // ------------------------------------------------------------------
     //  Parsing helpers

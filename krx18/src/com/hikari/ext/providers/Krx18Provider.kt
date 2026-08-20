@@ -11,6 +11,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Krx18 (krx18.com) — DooPlay-theme erotic/JAV movie site.
@@ -21,9 +26,13 @@ import java.net.URLEncoder
  *  - The DooPlay REST API serves A–Z browsing (`/wp-json/dooplay/glossary/`)
  *    and, per server, the player embed URL
  *    (`/wp-json/dooplayer/v2/<post>/<type>/<nume>` → `{embed_url}`).
- *  - Each embed is a JS-driven JWPlayer page (play.playkrx18.site,
- *    mov18plus.cloud) whose real source URL is produced by browser JS, so it is
- *    resolved with the WebView m3u8/mp4 capture helper.
+ *  - The primary server (play.playkrx18.site, a 9stream JWPlayer embed) hides
+ *    its source behind an AES-encrypted POST API, so it is resolved over plain
+ *    HTTP here: the embed page carries OpenSSL-AES-encrypted `idfile`/`iduser`
+ *    constants, which are decrypted and re-encrypted into a signed config blob
+ *    for `POST <api>/playiframe`; the response's hex-encrypted `data` decrypts
+ *    to the m3u8 URL. Loadvid/mov18plus embeds are protected differently and
+ *    fall back to the generic WebView m3u8/mp4 capture.
  */
 class Krx18Provider : HikariProvider {
 
@@ -32,7 +41,7 @@ class Krx18Provider : HikariProvider {
     override val mainUrl = "https://krx18.com"
     override val description = "Erotic/JAV movies, DooPlay-powered, with multi-server JWPlayer embeds."
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
-    override val version = 1
+    override val version = 2
 
     companion object {
         private const val BASE = "https://krx18.com"
@@ -40,6 +49,14 @@ class Krx18Provider : HikariProvider {
         private val htmlCache = HashMap<String, Pair<Long, String>>()
         private val cacheMutex = Mutex()
         private val streamCapture = Regex("""https?://[^"'\s]+?\.(?:m3u8|mp4)(?:[?#][^"'\s]*)?""")
+
+        // 9stream / play.playkrx18.site embedded keys (reverse-engineered from
+        // the player bundle; stable across page loads).
+        private const val KEY_IDFILE = "jcLycoRJT6OWjoWspgLMOZwS3aSS0lEn"
+        private const val KEY_IDUSER = "PZZ3J3LDbLT0GY7qSA5wW5vchqgpO36O"
+        private const val KEY_CONFIG = "vlVbUQhkOhoSfyteyzGeeDzU0BHoeTyZ"
+        private const val KEY_RESPONSE = "oJwvmmVBajMaRCTklxbfjavpQO7SZpsL"
+        private const val MD5_SALT = "KRWN3AdgmxEMcd2vLN1ju9qKe8Feco5h"
     }
 
     override fun catalogs(): List<HikariCatalog> = buildList {
@@ -122,28 +139,210 @@ class Krx18Provider : HikariProvider {
             val embed = runCatching { JSONObject(playerJson).optString("embed_url") }.getOrNull()
                 ?.takeIf { it.startsWith("http") } ?: continue
             val targets = if (embed.contains("<iframe")) {
-                Regex("""src="([^"]+)""").find(embed)?.groupValues?.get(1) ?: continue
+                Regex("""src="([^"]+)"""").find(embed)?.groupValues?.get(1) ?: continue
             } else embed
-            val hits = try {
-                HikariNet.resolveWithWebView(targets, streamCapture, timeoutMs = 45_000)
+            val streams = try {
+                resolveEmbed(targets, label)
             } catch (t: Throwable) {
-                continue
+                emptyList()
             }
-            for (h in hits) {
-                val u = h.url
-                if (u.isBlank() || !seen.add(u)) continue
-                out.add(
-                    HikariStream(
-                        name = if (label.isBlank()) "Stream" else "Server · $label",
-                        url = u,
-                        headers = h.headers,
-                        isM3u8 = u.contains(".m3u8", ignoreCase = true),
-                    )
-                )
+            for (s in streams) {
+                if (s.url.isBlank() || !seen.add(s.url)) continue
+                out.add(s)
             }
             if (out.isNotEmpty()) break // first working server is enough
         }
         return out
+    }
+
+    /**
+     * Resolves one server's embed to playable streams. The 9stream
+     * (play.playkrx18.site) server is decrypted over plain HTTP; unknown embed
+     * hosts fall back to the WebView capture. Loadvid and mov18plus embeds are
+     * skipped outright: loadvid's manifest is fetched as blob content by its
+     * own JS (never a capturable URL), and mov18plus redirects away unless it
+     * is embedded in an iframe — so their WebView attempts can only burn time.
+     */
+    private suspend fun resolveEmbed(embed: String, label: String): List<HikariStream> {
+        if (embed.contains("playkrx18.site", ignoreCase = true)) {
+            val direct = resolvePlaykrx18(embed)
+            if (direct.isNotEmpty()) return direct
+        }
+        if (embed.contains("loadvid.com", ignoreCase = true) ||
+            embed.contains("mov18plus.cloud", ignoreCase = true)
+        ) {
+            return emptyList()
+        }
+        return try {
+            HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 45_000).map { h ->
+                HikariStream(
+                    name = if (label.isBlank()) "Server" else "Server · $label",
+                    url = h.url,
+                    headers = h.headers,
+                    isM3u8 = h.url.contains(".m3u8", ignoreCase = true),
+                )
+            }
+        } catch (t: Throwable) {
+            emptyList()
+        }
+    }
+
+    /**
+     * play.playkrx18.site "9stream" embed over plain HTTP. Mirrors the page's
+     * own JS: decrypt `idfile`/`iduser` (OpenSSL AES), encrypt the config
+     * object (OpenSSL AES), POST `data=<enc>|<md5(enc+salt)>` to the play API,
+     * then decrypt the hex-encoded `data` in the JSON response to get the m3u8.
+     */
+    private suspend fun resolvePlaykrx18(embed: String): List<HikariStream> {
+        val page = getCached(embed) ?: return emptyList()
+        val apiBase = Regex("""const DOMAIN_API = ['"]([^'"]+)['"]""").find(page)?.groupValues?.get(1)
+            ?.takeIf { it.startsWith("http") } ?: return emptyList()
+        val idfileEnc = Regex("""const idfile_enc = ["']([0-9a-fA-F]+)["']""").find(page)?.groupValues?.get(1)
+            ?: return emptyList()
+        val iduserEnc = Regex("""const idUser_enc = ["']([0-9a-fA-F]+)["']""").find(page)?.groupValues?.get(1)
+            ?: return emptyList()
+        val jwKey = Regex("""jwplayer\.key = "([^"]+)";""").find(page)?.groupValues?.get(1).orEmpty()
+
+        val idfile = openSslDecryptHex(idfileEnc, KEY_IDFILE) ?: return emptyList()
+        val iduser = openSslDecryptHex(iduserEnc, KEY_IDUSER) ?: return emptyList()
+
+        val jwplayer = JSONObject()
+        if (jwKey.isNotBlank()) jwplayer.put("key", jwKey)
+        jwplayer.put("version", "8.20.1")
+        jwplayer.put("type", "html5")
+
+        // Config must serialize in EXACTLY this key order — the API verifies
+        // MD5 over the encrypted blob, so the plaintext must match the page's
+        // JSON.stringify order byte for byte.
+        val config = buildString {
+            append("{\"idfile\":\"").append(jsonEscape(idfile)).append("\"")
+            append(",\"iduser\":\"").append(jsonEscape(iduser)).append("\"")
+            append(",\"domain_play\":\"https://krx18.com\"")
+            append(",\"platform\":\"\"")
+            append(",\"hlsSupport\":true")
+            append(",\"jwplayer\":{\"key\":\"").append(jsonEscape(jwplayer.optString("key"))).append("\",\"version\":\"8.20.1\",\"type\":\"html5\"}")
+            append("}")
+        }
+
+        val encrypted = openSslEncrypt(config.toString(), KEY_CONFIG) ?: return emptyList()
+        val signature = md5Hex(encrypted + MD5_SALT)
+        val body = "data=" + URLEncoder.encode("$encrypted|$signature", "UTF-8")
+
+        val origin = runCatching { "https://" + Regex("""https?://([^/]+)""").find(embed)?.groupValues?.get(1) }
+            .getOrDefault(embed)
+        val headers = mapOf(
+            "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
+            "Referer" to embed,
+            "Origin" to origin,
+            "X-Requested-With" to "XMLHttpRequest",
+            "Accept" to "application/json, text/javascript, */*; q=0.01",
+        )
+        val resp = HikariNet.postString(
+            apiBase + "/playiframe",
+            body,
+            headers,
+            "application/x-www-form-urlencoded; charset=UTF-8",
+        ) ?: return emptyList()
+        val json = runCatching { JSONObject(resp) }.getOrNull() ?: return emptyList()
+        val status = json.optInt("status", -1)
+        val type = json.optString("type")
+        val data = json.optString("data").takeIf { it.isNotBlank() } ?: return emptyList()
+        // The success path is status==1; status==0 can also carry a
+        // `type:"url-m3u8-encv1"` payload.
+        if (status != 1 && type != "url-m3u8-encv1") return emptyList()
+        val playlist = openSslDecryptHex(data, KEY_RESPONSE)?.trim() ?: return emptyList()
+        if (!playlist.startsWith("http")) return emptyList()
+        return listOf(
+            HikariStream(
+                name = "Server · playkrx18",
+                url = playlist,
+                headers = mapOf(
+                    "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
+                    "Referer" to embed,
+                ),
+                isM3u8 = playlist.contains(".m3u8", ignoreCase = true),
+            )
+        )
+    }
+
+    // ------------------------------------------------------------------
+    //  Crypto (OpenSSL "Salted__" AES via EVP_BytesToKey, MD5) — mirrors the
+    //  embed's CryptoJS calls exactly.
+    // ------------------------------------------------------------------
+
+    private fun openSslDecryptHex(hex: String, passphrase: String): String? {
+        val raw = hexToBytes(hex) ?: return null
+        if (raw.size <= 16) return null
+        val keyIv = evpBytesToKey(passphrase, raw.copyOfRange(8, 16))
+        return try {
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyIv, 0, 32, "AES"), IvParameterSpec(keyIv, 32, 16))
+            String(cipher.doFinal(raw, 16, raw.size - 16), Charsets.UTF_8)
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    private fun openSslEncrypt(plain: String, passphrase: String): String? {
+        val salt = ByteArray(8).also { SecureRandom().nextBytes(it) }
+        val keyIv = evpBytesToKey(passphrase, salt)
+        val ct = try {
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyIv, 0, 32, "AES"), IvParameterSpec(keyIv, 32, 16))
+            cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
+        } catch (t: Throwable) {
+            return null
+        }
+        val out = ByteArray(16 + ct.size)
+        val magic = "Salted__".toByteArray(Charsets.US_ASCII)
+        System.arraycopy(magic, 0, out, 0, 8)
+        System.arraycopy(salt, 0, out, 8, 8)
+        System.arraycopy(ct, 0, out, 16, ct.size)
+        return HikariNet.base64Encode(out)
+    }
+
+    /** EVP_BytesToKey: MD5-chained passphrase+salt, first 48 bytes → key(32)+iv(16). */
+    private fun evpBytesToKey(passphrase: String, salt: ByteArray): ByteArray {
+        val md = MessageDigest.getInstance("MD5")
+        val out = java.io.ByteArrayOutputStream()
+        var prev = ByteArray(0)
+        val pass = passphrase.toByteArray(Charsets.UTF_8)
+        while (out.size() < 48) {
+            md.reset()
+            md.update(prev)
+            md.update(pass)
+            md.update(salt)
+            prev = md.digest()
+            out.write(prev)
+        }
+        return out.toByteArray()
+    }
+
+    private fun hexToBytes(s: String): ByteArray? {
+        if (s.length % 2 != 0) return null
+        val out = ByteArray(s.length / 2)
+        for (i in out.indices) {
+            out[i] = s.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+        return out
+    }
+
+    private fun md5Hex(s: String): String {
+        val md = MessageDigest.getInstance("MD5")
+        return md.digest(s.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    }
+
+    private fun jsonEscape(s: String): String = buildString {
+        for (c in s) {
+            when (c) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -154,9 +353,9 @@ class Krx18Provider : HikariProvider {
         val pageUrl = if (page <= 1) url else insertPage(url, page)
         val html = getCached(pageUrl) ?: return emptyList()
         val out = LinkedHashMap<String, HikariMedia>()
-        for (chunk in html.split(Regex("""<article class="item""")).drop(1)) {
-            val link = Regex("""<a href="(https://krx18\.com/movies/[^"]+)""").find(chunk)?.groupValues?.get(1) ?: continue
-            val img = Regex("""<img\s+src="([^"]+)""").find(chunk)?.groupValues?.get(1) ?: continue
+        for (chunk in html.split(Regex("""<article class="item"""")).drop(1)) {
+            val link = Regex("""<a href="(https://krx18\.com/movies/[^"]+)"""").find(chunk)?.groupValues?.get(1) ?: continue
+            val img = Regex("""<img\s+src="([^"]+)"""").find(chunk)?.groupValues?.get(1) ?: continue
             var title: String? = Regex("""<h3 class="title">([\s\S]*?)</h3>""").find(chunk)?.groupValues?.get(1)
                 ?.let { unescapeEntities(it).trim() }
             if (title.isNullOrBlank()) {
@@ -164,10 +363,10 @@ class Krx18Provider : HikariProvider {
                     ?.let { unescapeEntities(it).trim() }
             }
             if (title.isNullOrBlank()) {
-                title = Regex("""<img\s+src="[^"]+" alt="([^"]*)""").find(chunk)?.groupValues?.get(1) ?: ""
+                title = Regex("""<img\s+src="[^"]+" alt="([^"]*)"""").find(chunk)?.groupValues?.get(1) ?: ""
             }
             if (title.isNullOrBlank()) continue
-            val id = Regex("""id="post-(\d+)""").find(chunk)?.groupValues?.get(1)
+            val id = Regex("""id="post-(\d+)"""").find(chunk)?.groupValues?.get(1)
                 ?: link.substringAfterLast("/").trimEnd('/')
             if (id.isBlank()) continue
             out[id] = HikariMedia(
@@ -184,7 +383,7 @@ class Krx18Provider : HikariProvider {
     /** DooPlay A–Z glossary: `{ "<postid>": {title,url,img,year} }`. Needs the
      *  page nonce, fetched fresh from the cached home page (WP nonces rotate). */
     private suspend fun parseGlossary(letter: String): List<HikariMedia> {
-        val nonce = Regex("""var dtGonza = \{[\s\S]*?"nonce":"([^"]+)""")
+        val nonce = Regex("""var dtGonza = \{[\s\S]*?"nonce":"([^"]+)"""")
             .find(getCached("$BASE/") ?: return emptyList())?.groupValues?.get(1) ?: return emptyList()
         val json = getCached("$BASE/wp-json/dooplay/glossary/?nonce=$nonce&term=$letter&type=movies")
             ?: return emptyList()
@@ -230,7 +429,7 @@ class Krx18Provider : HikariProvider {
                 if (now - t < CACHE_TTL_MS) return html
             }
         }
-        val html = HikariNet.getString(url) ?: return null
+        val html = HikariNet.getStringSmart(url) ?: return null
         cacheMutex.withLock {
             if (htmlCache.size > 60) htmlCache.clear()
             htmlCache[url] = now to html
@@ -239,8 +438,7 @@ class Krx18Provider : HikariProvider {
     }
 
     private fun metaProperty(html: String, property: String): String? =
-        Regex("""<meta\s+property="$property"\s+content="([^"]*)""")
-            .find(html)?.groupValues?.get(1)
+        Regex("""<meta\s+property="$property"\s+content="([^"]*)"""").find(html)?.groupValues?.get(1)
 
     private fun unescapeEntities(s: String): String = s
         .replace("&quot;", "\"")

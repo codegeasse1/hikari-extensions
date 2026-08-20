@@ -30,7 +30,7 @@ class JavOpenProvider : HikariProvider {
     override val name = "JavOpen"
     override val mainUrl = "https://javopen.co"
     override val description = "JAV from javopen.co — newest uploads, censored/uncensored categories and search, with direct HLS from the site's turbovidhls/upload18 players."
-    override val version = 1
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -211,8 +211,7 @@ class JavOpenProvider : HikariProvider {
                 .find(chunk) ?: continue
             val title = unescape(m.groupValues[1])
             val href = m.groupValues[2]
-            val img = Regex("""<img[^>]*src="([^"]+)"[^>]*class="img-responsive wp-post-image""")
-                .find(chunk)?.groupValues?.get(1)
+            val img = findCardPoster(chunk)
             out[href] = HikariMedia(
                 id = href,
                 title = title,
@@ -221,6 +220,18 @@ class JavOpenProvider : HikariProvider {
             )
         }
         return out.values.toList()
+    }
+
+    /**
+     * Poster URL from a card chunk. Cards below the fold are lazy-loaded by
+     * perfmatters, so the real URL sits in `data-src` (after the class attr)
+     * rather than `src`, which carries an SVG placeholder for those.
+     */
+    private fun findCardPoster(chunk: String): String? {
+        val tag = Regex("""<img[^>]*class="img-responsive wp-post-image[^"]*"[^>]*>""")
+            .find(chunk)?.value ?: return null
+        return Regex("""data-src="([^"]+)"""").find(tag)?.groupValues?.get(1)
+            ?: Regex("""src="([^"]+)"""").find(tag)?.groupValues?.get(1)
     }
 
     private suspend fun getCached(url: String): String? {
