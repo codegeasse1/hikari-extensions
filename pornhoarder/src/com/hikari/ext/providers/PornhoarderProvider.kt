@@ -19,22 +19,25 @@ import java.net.URLEncoder
  *    (`search`, `sort`, `page` fields) which returns plain card HTML.
  *  - Trending is server-rendered at `/trending-videos/?page=N`.
  *  - The video page lists every host as a `/pornvideo/<slug>/<hostHash>/`
- *    link. The site's main player (`pornhoarder.net/player.php`) is gated
- *    behind a human image captcha, but each host page has a direct download
- *    stub — `pornhoarder.net/download.php?video=<hostHash>` embeds
- *    `var durl = "<base64>"`, whose decoded value is the host's own watch
- *    page (e.g. `https://streamtape.to/v/<id>/`). Those pages are JS-driven
- *    players, so every host is resolved with the WebView mp4 capture helper
- *    (headers + cookies included), exactly like the main player flow would
- *    after a human passes the captcha.
+ *    link (plus the main `player.php` iframe). Each host hash resolves
+ *    through `pornhoarder.net/download.php?video=<hostHash>`, whose
+ *    `var durl = "<base64>"` decodes to the host's own page (e.g.
+ *    `https://luluvdo.com/d/<id>/`). Those host pages usually hide the
+ *    stream URL inside a Dean Edwards p,a,c,k packed script, so we fetch
+ *    each host page over HTTP and unpack it; JS-only hosts (captcha-gated
+ *    doodstream, etc.) fall back to the WebView capture helper.
+ *
+ *  Dailymotion-hosted mirrors are deliberately skipped — Dailymotion is
+ *  blocked/geo-banned in several countries, so those servers would just
+ *  appear as broken "Server N" entries.
  */
 class PornhoarderProvider : HikariProvider {
 
     override val id = "pornhoarder"
     override val name = "PornHoarder"
     override val mainUrl = "https://pornhoarder.st"
-    override val description = "Pornhoarder.tv mirrors — latest, trending and search with WebView-resolved playback from streamtape/doodstream/etc."
-    override val version = 1
+    override val description = "Pornhoarder.tv mirrors — latest, trending and search with HTTP-resolved playback from lulustream/streamtape/etc."
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -51,7 +54,13 @@ class PornhoarderProvider : HikariProvider {
             "Accept-Language" to "en-US,en;q=0.9",
         )
 
-        private val streamCapture = Regex("""https?://[^"'\\s]+?\\.(?:m3u8|mp4)(?:[?#][^"'\\s]*)?""")
+        private val streamCapture = Regex("""https?://[^"'\s]+?\.(?:m3u8|mp4)(?:[?#][^"'\s]*)?""")
+
+        private val absStreamRegex = Regex("""https?://[^"'\s>]+?\.(?:m3u8|mp4)(?:[?#][^"'\s>]*)?""")
+        private val relM3u8Regex = Regex("""(?:"|')(/[^"'\s]+?\.m3u8[^"'\s]*)(?:"|')""")
+        private const val PACKED_OPEN = "function(p,a,c,k,e,d)"
+        private const val PACKED_MID = "return p}("
+        private const val BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     }
 
     override fun catalogs(): List<HikariCatalog> = listOf(
@@ -114,9 +123,10 @@ class PornhoarderProvider : HikariProvider {
             }
         if (hashes.isEmpty()) return emptyList()
 
+        // Resolve each host hash to its actual host page via download.php.
         val hostUrls = ArrayList<String>()
         for (hash in hashes) {
-            if (hostUrls.size >= 3) break
+            if (hostUrls.size >= 6) break
             // download.php does a literal comparison of the raw query value,
             // so pass the base64 hash unencoded (the site's own links do too).
             val dl = getCached("$DL/download.php?video=$hash") ?: continue
@@ -125,32 +135,155 @@ class PornhoarderProvider : HikariProvider {
                 ?.let { String(it, Charsets.UTF_8) }
                 ?.takeIf { it.startsWith("http") }
                 ?: continue
+            if (isDailymotion(hostUrl)) continue // banned in some countries — skip outright
             hostUrls.add(hostUrl)
         }
 
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
+        val started = System.currentTimeMillis()
         for (hostUrl in hostUrls) {
-            if (out.size >= 4) break
+            if (out.size >= 6) break
+            if (System.currentTimeMillis() - started > 60_000) break
+
+            // 1) HTTP resolution — the host page (or its packed script) usually
+            //    contains the m3u8/mp4 directly.
+            val hostHtml = HikariNet.getStringSmart(hostUrl, pageHeaders + mapOf("Referer" to pageUrl))
+            if (hostHtml != null) {
+                for (u in extractStreamUrls(hostHtml, hostUrl)) {
+                    if (isDailymotion(u)) continue
+                    if (!seen.add(u)) continue
+                    out.add(
+                        HikariStream(
+                            name = "Server ${out.size + 1}",
+                            url = u,
+                            headers = mapOf("Referer" to hostUrl),
+                            isM3u8 = u.contains(".m3u8", ignoreCase = true),
+                        )
+                    )
+                }
+            }
+            if (out.size >= 6) break
+
+            // 2) WebView fallback for JS-only hosts.
             val hits = try {
-                HikariNet.resolveWithWebView(hostUrl, streamCapture, timeoutMs = 45_000)
+                HikariNet.resolveWithWebView(hostUrl, streamCapture, timeoutMs = 30_000)
             } catch (t: Throwable) {
                 continue
             }
             for (h in hits) {
                 val u = h.url
-                if (u.isBlank() || !seen.add(u)) continue
+                if (u.isBlank() || isDailymotion(u) || !seen.add(u)) continue
                 out.add(
                     HikariStream(
                         name = "Server ${out.size + 1}",
                         url = u,
-                        headers = h.headers,
+                        headers = h.headers + mapOf("Referer" to hostUrl),
                         isM3u8 = u.contains(".m3u8", ignoreCase = true),
                     )
                 )
             }
         }
         return out
+    }
+
+    // ------------------------------------------------------------------
+    //  Stream extraction helpers
+    // ------------------------------------------------------------------
+
+    private fun isDailymotion(u: String): Boolean {
+        val host = u.substringAfter("://").substringBefore("/").lowercase()
+        return host.contains("dailymotion") || host.contains("dmcdn")
+    }
+
+    /** Unpacks every Dean Edwards p,a,c,k packed script in [html] and returns the decoded JS. */
+    private fun unpackPackedScripts(html: String): String {
+        val out = StringBuilder()
+        var idx = 0
+        while (true) {
+            val start = html.indexOf(PACKED_OPEN, idx)
+            if (start < 0) break
+            val open = html.indexOf(PACKED_MID, start)
+            if (open < 0) break
+            val q = open + PACKED_MID.length
+            if (q >= html.length || html[q] != '\'') {
+                idx = open + PACKED_MID.length
+                continue
+            }
+            val enc = StringBuilder()
+            var i = q + 1
+            while (i < html.length && html[i] != '\'') {
+                val ch = html[i]
+                if (ch == '\\' && i + 1 < html.length) {
+                    enc.append(html[i + 1])
+                    i += 2
+                } else {
+                    enc.append(ch)
+                    i++
+                }
+            }
+            if (i >= html.length) break
+            val rest = html.substring(i + 1)
+            val m = Regex(""",(\d+),(\d+),'([\s\S]*?)'\.split\('\|'\)""").find(rest) ?: break
+            val base = m.groupValues[1].toIntOrNull() ?: break
+            val count = m.groupValues[2].toIntOrNull() ?: break
+            val words = m.groupValues[3].split("|")
+            var decoded = enc.toString()
+            for (ci in count - 1 downTo 0) {
+                val token = if (base <= 36) ci.toString(base) else toBase62(ci, base)
+                decoded = decoded.replace(Regex("\\b" + token + "\\b"), words.getOrElse(ci) { "" })
+            }
+            out.append('\n').append(decoded)
+            val after = rest.indexOf(".split('|')") + ".split('|')".length
+            idx = i + 1 + after
+        }
+        return out.toString()
+    }
+
+    private fun toBase62(n: Int, base: Int): String {
+        var v = n
+        if (v == 0) return "0"
+        val sb = StringBuilder()
+        while (v > 0) {
+            sb.append(BASE62[v % base])
+            v /= base
+        }
+        return sb.reverse().toString()
+    }
+
+    private fun isUsableStreamUrl(u: String): Boolean {
+        val l = u.lowercase()
+        if (l.contains(".jpg") || l.contains(".jpeg") || l.contains(".png") ||
+            l.contains(".webp") || l.contains(".gif") || l.contains(".svg") || l.contains(".txt")
+        ) return false
+        return l.contains(".m3u8") || l.contains(".mp4")
+    }
+
+    private fun resolveRelative(rel: String, base: String): String? {
+        val schemeEnd = base.indexOf("://")
+        if (schemeEnd < 0) return null
+        val pathStart = base.indexOf('/', schemeEnd + 3)
+        val origin = if (pathStart < 0) base else base.substring(0, pathStart)
+        return origin + rel
+    }
+
+    /** Extracts stream URLs from an embed/host page: raw HTML first, then decoded packed JS. */
+    private fun extractStreamUrls(html: String, baseUrl: String): List<String> {
+        val text = (html + "\n" + unpackPackedScripts(html)).replace("\\/", "/")
+        val abs = LinkedHashSet<String>()
+        val rel = LinkedHashSet<String>()
+        for (m in absStreamRegex.findAll(text)) {
+            val u = m.value.trim().trimEnd('"', '\'')
+            if (isUsableStreamUrl(u)) abs.add(u)
+        }
+        for (m in relM3u8Regex.findAll(text)) {
+            val r = resolveRelative(m.groupValues[1], baseUrl) ?: continue
+            if (isUsableStreamUrl(r)) rel.add(r)
+        }
+        val all = LinkedHashSet<String>()
+        for (u in abs + rel) if (u.contains(".m3u8", ignoreCase = true)) all.add(u)
+        for (u in abs + rel) if (!u.contains(".m3u8", ignoreCase = true)) all.add(u)
+        return all.toList()
     }
 
     // ------------------------------------------------------------------

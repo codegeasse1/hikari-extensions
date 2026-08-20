@@ -18,17 +18,22 @@ import java.net.URLEncoder
  *  - Home/category/search pages are grids of `article.loop-video` cards.
  *  - Each video page lists 4-6 player servers as `span.change-video`
  *    buttons carrying `data-embed` URLs (luluvids.top, bysezoxexe.com,
- *    playmogo.com, morencius.com, hgcloud.to, abyssplayer.com…). Those embeds
- *    are JS-driven players whose streams are only produced by a real browser,
- *    so every server is resolved with the WebView m3u8/mp4 capture helper.
+ *    playmogo.com, morencius.com, hgcloud.to, abyssplayer.com…).
+ *
+ *  Most of those embeds hide their stream URL inside a Dean Edwards p,a,c,k
+ *  packed script in the embed's own HTML (luluvids/vidhide-style jwplayer
+ *  pages). We therefore fetch each embed over HTTP first, unpack the packed
+ *  scripts and pull the m3u8/mp4 out of the decoded JS — fast and reliable.
+ *  JS-only players (React SPAs, captcha-gated hosts) fall back to the
+ *  WebView m3u8/mp4 capture helper.
  */
 class LeakPornerProvider : HikariProvider {
 
     override val id = "leakporner"
     override val name = "LeakPorner"
     override val mainUrl = "https://leakporner.org"
-    override val description = "Leaked/OF adult videos from leakporner.org — latest uploads, search and multi-server WebView-resolved playback."
-    override val version = 1
+    override val description = "Leaked/OF adult videos from leakporner.org — latest uploads, search and multi-server HTTP-resolved playback."
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -45,6 +50,12 @@ class LeakPornerProvider : HikariProvider {
         )
 
         private val streamCapture = Regex("""https?://[^"'\s]+?\.(?:m3u8|mp4)(?:[?#][^"'\s]*)?""")
+
+        private val absStreamRegex = Regex("""https?://[^"'\s>]+?\.(?:m3u8|mp4)(?:[?#][^"'\s>]*)?""")
+        private val relM3u8Regex = Regex("""(?:"|')(/[^"'\s]+?\.m3u8[^"'\s]*)(?:"|')""")
+        private const val PACKED_OPEN = "function(p,a,c,k,e,d)"
+        private const val PACKED_MID = "return p}("
+        private const val BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     }
 
     override fun catalogs(): List<HikariCatalog> = listOf(
@@ -91,17 +102,43 @@ class LeakPornerProvider : HikariProvider {
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
         val pageUrl = media.id.takeIf { it.startsWith("http") } ?: return emptyList()
         val html = getCached(pageUrl) ?: return emptyList()
-        val embeds = Regex("""data-embed="([^"]+)""")
+        val embeds = Regex("""data-embed="([^"]+)"""")
             .findAll(html).map { it.groupValues[1] }
             .filter { it.startsWith("http") }
             .toList()
             .distinct()
+
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
+        val started = System.currentTimeMillis()
         for (embed in embeds) {
             if (out.size >= 4) break
+            if (System.currentTimeMillis() - started > 60_000) break
+
+            // 1) HTTP resolution — the embed's own HTML (or its packed script)
+            //    usually contains the m3u8/mp4 directly.
+            val embedHtml = HikariNet.getStringSmart(
+                embed,
+                pageHeaders + mapOf("Referer" to pageUrl, "X-Requested-With" to "XMLHttpRequest"),
+            )
+            if (embedHtml != null) {
+                for (u in extractStreamUrls(embedHtml, embed)) {
+                    if (!seen.add(u)) continue
+                    out.add(
+                        HikariStream(
+                            name = "Server ${out.size + 1}",
+                            url = u,
+                            headers = mapOf("Referer" to embed),
+                            isM3u8 = u.contains(".m3u8", ignoreCase = true),
+                        )
+                    )
+                }
+            }
+            if (out.size >= 4) break
+
+            // 2) WebView fallback for JS-driven players (React SPAs, captchas…).
             val hits = try {
-                HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 45_000)
+                HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 30_000)
             } catch (t: Throwable) {
                 continue
             }
@@ -112,13 +149,107 @@ class LeakPornerProvider : HikariProvider {
                     HikariStream(
                         name = "Server ${out.size + 1}",
                         url = u,
-                        headers = h.headers,
+                        headers = h.headers + mapOf("Referer" to embed),
                         isM3u8 = u.contains(".m3u8", ignoreCase = true),
                     )
                 )
             }
         }
         return out
+    }
+
+    // ------------------------------------------------------------------
+    //  Stream extraction helpers
+    // ------------------------------------------------------------------
+
+    /** Unpacks every Dean Edwards p,a,c,k packed script in [html] and returns the decoded JS. */
+    private fun unpackPackedScripts(html: String): String {
+        val out = StringBuilder()
+        var idx = 0
+        while (true) {
+            val start = html.indexOf(PACKED_OPEN, idx)
+            if (start < 0) break
+            val open = html.indexOf(PACKED_MID, start)
+            if (open < 0) break
+            val q = open + PACKED_MID.length
+            if (q >= html.length || html[q] != '\'') {
+                idx = open + PACKED_MID.length
+                continue
+            }
+            val enc = StringBuilder()
+            var i = q + 1
+            while (i < html.length && html[i] != '\'') {
+                val ch = html[i]
+                if (ch == '\\' && i + 1 < html.length) {
+                    enc.append(html[i + 1])
+                    i += 2
+                } else {
+                    enc.append(ch)
+                    i++
+                }
+            }
+            if (i >= html.length) break
+            val rest = html.substring(i + 1)
+            val m = Regex(""",(\d+),(\d+),'([\s\S]*?)'\.split\('\|'\)""").find(rest) ?: break
+            val base = m.groupValues[1].toIntOrNull() ?: break
+            val count = m.groupValues[2].toIntOrNull() ?: break
+            val words = m.groupValues[3].split("|")
+            var decoded = enc.toString()
+            for (ci in count - 1 downTo 0) {
+                val token = if (base <= 36) ci.toString(base) else toBase62(ci, base)
+                decoded = decoded.replace(Regex("\\b" + token + "\\b"), words.getOrElse(ci) { "" })
+            }
+            out.append('\n').append(decoded)
+            val after = rest.indexOf(".split('|')") + ".split('|')".length
+            idx = i + 1 + after
+        }
+        return out.toString()
+    }
+
+    private fun toBase62(n: Int, base: Int): String {
+        var v = n
+        if (v == 0) return "0"
+        val sb = StringBuilder()
+        while (v > 0) {
+            sb.append(BASE62[v % base])
+            v /= base
+        }
+        return sb.reverse().toString()
+    }
+
+    private fun isUsableStreamUrl(u: String): Boolean {
+        val l = u.lowercase()
+        if (l.contains(".jpg") || l.contains(".jpeg") || l.contains(".png") ||
+            l.contains(".webp") || l.contains(".gif") || l.contains(".svg") || l.contains(".txt")
+        ) return false
+        return l.contains(".m3u8") || l.contains(".mp4")
+    }
+
+    private fun resolveRelative(rel: String, base: String): String? {
+        val schemeEnd = base.indexOf("://")
+        if (schemeEnd < 0) return null
+        val pathStart = base.indexOf('/', schemeEnd + 3)
+        val origin = if (pathStart < 0) base else base.substring(0, pathStart)
+        return origin + rel
+    }
+
+    /** Extracts stream URLs from an embed/host page: raw HTML first, then decoded packed JS. */
+    private fun extractStreamUrls(html: String, baseUrl: String): List<String> {
+        val text = (html + "\n" + unpackPackedScripts(html)).replace("\\/", "/")
+        val abs = LinkedHashSet<String>()
+        val rel = LinkedHashSet<String>()
+        for (m in absStreamRegex.findAll(text)) {
+            val u = m.value.trim().trimEnd('"', '\'')
+            if (isUsableStreamUrl(u)) abs.add(u)
+        }
+        for (m in relM3u8Regex.findAll(text)) {
+            val r = resolveRelative(m.groupValues[1], baseUrl) ?: continue
+            if (isUsableStreamUrl(r)) rel.add(r)
+        }
+        val all = LinkedHashSet<String>()
+        for (u in abs + rel) if (u.contains(".m3u8", ignoreCase = true)) all.add(u)
+        for (u in abs + rel) if (!u.contains(".m3u8", ignoreCase = true)) all.add(u)
+        return all.toList()
     }
 
     // ------------------------------------------------------------------
@@ -133,7 +264,7 @@ class LeakPornerProvider : HikariProvider {
                 .find(chunk) ?: continue
             val href = m.groupValues[1]
             val title = unescape(m.groupValues[2])
-            val img = Regex("""<img[^>]*data-src="([^"]+)""").find(chunk)?.groupValues?.get(1)
+            val img = Regex("""<img[^>]*data-src="([^"]+)"""").find(chunk)?.groupValues?.get(1)
             out[href] = HikariMedia(
                 id = href,
                 title = title,
@@ -160,7 +291,7 @@ class LeakPornerProvider : HikariProvider {
     }
 
     private fun metaProperty(html: String, property: String): String? =
-        Regex("""<meta\s+property="$property"\s+content="([^"]*)""").find(html)?.groupValues?.get(1)
+        Regex("""<meta\s+property="$property"\s+content="([^"]*)"""").find(html)?.groupValues?.get(1)
 
     private fun stripTags(s: String): String = s
         .replace(Regex("""<[^>]+>"""), " ")
