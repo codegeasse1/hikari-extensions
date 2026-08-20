@@ -98,7 +98,7 @@ class JustAnimeProvider : HikariProvider {
                     HikariEpisode(
                         number = number,
                         id = "$id|$number",
-                        name = e.optString("title").takeIf { it.isNotBlank() } ?: "Episode $number",
+                        name = e.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: "Episode $number",
                         image = e.optString("image").takeIf { it.isNotBlank() },
                     )
                 )
@@ -145,7 +145,7 @@ class JustAnimeProvider : HikariProvider {
         val json = getJsonCached("$API/anime/${media.id}") ?: return media
         val d = json.optJSONObject("data") ?: json
         val title = d.title()
-            ?.takeIf { it.isNotBlank() } ?: media.title
+            ?.takeIf { it.isNotBlank() && it != "null" } ?: media.title
         val poster = d.coverImagePoster()
             ?.takeIf { it.startsWith("http") } ?: media.posterUrl
         val plot = d.optString("description")
@@ -287,8 +287,8 @@ class JustAnimeProvider : HikariProvider {
     }
 
     private fun JSONObject.toMedia(): HikariMedia? {
-        val id = optString("id").takeIf { it.isNotBlank() } ?: return null
-        val title = title()?.takeIf { it.isNotBlank() } ?: return null
+        val id = optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
+        val title = title()?.takeIf { it.isNotBlank() && it != "null" } ?: return null
         val poster = optString("cover").takeIf { it.startsWith("http") }
             ?: optString("bannerImage").takeIf { it.startsWith("http") }
         val type = mediaTypeOf(optString("type").ifBlank { optString("format") })
@@ -304,10 +304,10 @@ class JustAnimeProvider : HikariProvider {
     }
 
     private fun JSONObject.title(): String? {
-        val t = optJSONObject("title") ?: return optString("title").takeIf { it.isNotBlank() }
-        return t.optString("english").takeIf { it.isNotBlank() }
-            ?: t.optString("romaji").takeIf { it.isNotBlank() }
-            ?: t.optString("native").takeIf { it.isNotBlank() }
+        val t = optJSONObject("title") ?: return optString("title").takeIf { it.isNotBlank() && it != "null" }
+        return t.optString("english").takeIf { it.isNotBlank() && it != "null" }
+            ?: t.optString("romaji").takeIf { it.isNotBlank() && it != "null" }
+            ?: t.optString("native").takeIf { it.isNotBlank() && it != "null" }
     }
 
     private fun JSONObject.coverImagePoster(): String? {
