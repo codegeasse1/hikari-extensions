@@ -73,24 +73,65 @@ abstract class Cs3BridgeProvider(
             // plugin there (dex + load() can block for seconds → ANR) — and
             // never cache the null result, or the provider dies permanently.
             if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) return ""
-            return api?.mainUrl ?: ""
+            return api()?.mainUrl ?: ""
         }
 
-    private val api: MainAPI? by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { loadApi() }
+    // The plugin's load() can take a long time on cold start — CNC Verse live
+    // providers (e.g. PlayZTV) do a full network fetch inside load() with 30s
+    // OkHttp timeouts, which regularly outlives any single join cap. Unlike
+    // `by lazy`, a timed-out/failed load is NOT cached forever: we remember it
+    // with a short retry cooldown so one slow boot doesn't kill the provider
+    // for the rest of the session (it reloads on the next access / retry tap).
+    private val apiLock = Any()
+    @Volatile private var api: MainAPI? = null
+    @Volatile private var apiFailedAt = 0L
+
+    private fun api(): MainAPI? {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) return api
+        api?.let { return it }
+        synchronized(apiLock) {
+            api?.let { return it }
+            if (apiFailedAt != 0L && android.os.SystemClock.elapsedRealtime() - apiFailedAt < 30_000) {
+                // Don't hot-reload a just-failed plugin, but DO pick up a slow
+                // load that finished in the background since we gave up on it.
+                return cachedApis()?.also { api = it }
+            }
+            val loaded = loadApi()
+            if (loaded != null) {
+                api = loaded
+                apiFailedAt = 0L
+            } else {
+                apiFailedAt = android.os.SystemClock.elapsedRealtime()
+            }
+            return loaded
+        }
+    }
+
+    /** Non-blocking peek at the shared plugin cache (null = still nothing). */
+    private fun cachedApis(): MainAPI? {
+        val ctx = bridgeContext() ?: return null
+        val file = extract(ctx) ?: return null
+        return loadedPlugins[file.absolutePath]?.getOrNull(apiIndex)
+    }
 
     private val loadCache = ConcurrentHashMap<String, LoadResponse>()
 
     // ------------------------------------------------------------------ catalogs
 
     override fun catalogs(): List<HikariCatalog> {
-        val a = api ?: return emptyList()
+        val a = api() ?: return emptyList()
         return a.mainPage?.map { page ->
-            HikariCatalog(page.data, page.name.ifBlank { page.data }, catalogType(), page.data)
+            val raw = page.data
+            // Newer SDKs give new-style plugins a single blank MainPageData
+            // catalog (the real rows only come from getMainPage), so fall back
+            // to a friendly row title instead of an empty one.
+            val title = page.name.ifBlank { raw }.ifBlank { "Home" }
+            HikariCatalog(raw, title, catalogType(), raw)
         } ?: emptyList()
     }
 
     private fun catalogType(): HikariMediaType {
-        val types = api?.supportedTypes ?: return HikariMediaType.SERIES
+        val types = api()?.supportedTypes ?: return HikariMediaType.SERIES
         val movieOnly = types.isNotEmpty() && types.all {
             it == TvType.Movie || it == TvType.AnimeMovie || it == TvType.NSFW
         }
@@ -99,7 +140,7 @@ abstract class Cs3BridgeProvider(
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> =
         withContext(Dispatchers.IO) {
-            val a = api ?: return@withContext emptyList()
+            val a = api() ?: return@withContext emptyList()
             val resp = try {
                 a.getMainPage(page, MainPageRequest(catalog.name, catalog.id, false))
             } catch (t: Throwable) {
@@ -112,7 +153,7 @@ abstract class Cs3BridgeProvider(
 
     override suspend fun search(query: String, page: Int): List<HikariMedia> =
         withContext(Dispatchers.IO) {
-            val a = api ?: return@withContext emptyList()
+            val a = api() ?: return@withContext emptyList()
             try {
                 a.search(query).orEmpty().mapNotNull { it.toMedia() }
             } catch (t: Throwable) {
@@ -188,7 +229,7 @@ abstract class Cs3BridgeProvider(
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> =
         withContext(Dispatchers.IO) {
-            val a = api ?: return@withContext emptyList()
+            val a = api() ?: return@withContext emptyList()
             // For SERIES, the plugin's per-episode data string lives on the
             // episode and is already in episode.id. For MOVIES the provider
             // serialized its source list into MovieLoadResponse.dataUrl during
@@ -246,7 +287,7 @@ abstract class Cs3BridgeProvider(
         }
 
     private fun toStreams(rawLinks: List<ExtractorLink>, rawSubs: List<SubtitleFile>): List<HikariStream> {
-        val a = api
+        val a = api()
         return rawLinks
             .filter { it.url.isNotBlank() && it.url != a?.mainUrl && it.type.name != "ERROR" }
             .map { l ->
@@ -292,7 +333,7 @@ abstract class Cs3BridgeProvider(
     // ------------------------------------------------------------------ loading
 
     private fun loadApi(): MainAPI? {
-        // The lazy `api` is normally only touched from Dispatchers.IO contexts
+        // The `api()` accessor is normally only touched from Dispatchers.IO contexts
         // (catalogs/search/meta/streams). Guard against any accidental main
         // thread access — returning null is safe because the caller is always
         // a withContext(IO) wrapper that can retry the next call, and the
@@ -313,7 +354,7 @@ abstract class Cs3BridgeProvider(
         }.apply { isDaemon = true }
         worker.start()
         try {
-            worker.join(45_000)
+            worker.join(120_000)
         } catch (e: InterruptedException) {
             // ignore
         }
@@ -326,8 +367,25 @@ abstract class Cs3BridgeProvider(
         // same loaded API list. Keyed by the extracted file's absolute path.
         private val loadedPlugins = java.util.concurrent.ConcurrentHashMap<String, List<MainAPI>>()
 
-        private fun loadedCs3(ctx: Context, file: File): List<MainAPI> =
-            loadedPlugins.computeIfAbsent(file.absolutePath) { loadCs3(ctx, file) }
+        // Only SUCCESSFUL loads are cached — an empty result (load() threw or
+        // was still running when the join cap hit) must never be remembered,
+        // or every retry would replay the same empty catalog until the app is
+        // force-stopped. Serialized so concurrent retries can't double-load.
+        private val loadLock = java.util.concurrent.locks.ReentrantLock()
+
+        private fun loadedCs3(ctx: Context, file: File): List<MainAPI> {
+            val path = file.absolutePath
+            loadedPlugins[path]?.let { return it }
+            loadLock.lock()
+            try {
+                loadedPlugins[path]?.let { return it }
+                val apis = loadCs3(ctx, file)
+                if (apis.isNotEmpty()) loadedPlugins[path] = apis
+                return apis
+            } finally {
+                loadLock.unlock()
+            }
+        }
 
         /**
          * Loads a .cs3 archive the same way the app's Cs3PluginManager does:
@@ -451,7 +509,7 @@ abstract class Cs3BridgeProvider(
 
     private suspend fun loadResponse(id: String): LoadResponse? {
         loadCache[id]?.let { return it }
-        val a = api ?: return null
+        val a = api() ?: return null
         val r = try {
             withTimeoutOrNull(45_000) {
                 val first = tryLoad(a, id)
