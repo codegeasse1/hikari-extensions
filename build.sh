@@ -82,54 +82,14 @@ for dir in */; do
   if [ -f "$name/bridge-cs3.conf" ] && [ -f "$name/bridge-sources.txt" ]; then
     . "$name/bridge-cs3.conf"
     mkdir -p "build/pkg/cs3/$bridge_subdir"
-    while IFS=
-
-  BUILT="$BUILT $name"
-  echo "built $name.hiki"
-done
-
-if [ -z "$BUILT" ]; then
-  echo "no extensions found" >&2
-  exit 1
-fi
-
-# 5) regenerate repo.json from the built .hiki files + their manifests
-generate_repo_json() {
-  echo "{"
-  echo "  \"name\": \"Hikari Extensions\","
-  echo "  \"description\": \"Official .hiki extensions for Hikari.\","
-  echo "  \"plugins\": ["
-  first=1
-  for name in $BUILT; do
-    [ $first -eq 0 ] && echo ","
-    first=0
-    local ver
-    ver=$(sed -n 's/.*"version"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$name/manifest.json" | head -1)
-    ver="${ver:-1}"
-    local tvtypes
-    tvtypes=$(sed -n 's/.*"tvTypes"[^[]*\[\([^]]*\)\].*/\1/p' "$name/manifest.json" | head -1)
-    [ -n "$tvtypes" ] || tvtypes='"movie"'
-    printf '    {\n'
-    printf '      "name": "%s",\n' "$(sed -n 's/.*"name"[^"]*"\([^"]*\)".*/\1/p' "$name/manifest.json" | head -1)"
-    printf '      "description": "%s",\n' "Auto-built Hikari extension from this repo."
-    printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.hiki",\n' "$name"
-    printf '      "version": %s,\n' "$ver"
-    printf '      "tvTypes": [%s]\n' "$tvtypes"
-    printf '    }'
-  done
-  echo ""
-  echo "  ]"
-  echo "}"
-}
-generate_repo_json > repo.json
-echo "repo.json updated with:$BUILT"
-\t' read -r upstream packaged; do
+    while IFS=$'\t' read -r upstream packaged; do
       [ -z "$upstream" ] && continue
       packaged="${packaged:-$upstream}"
       curl -fsSL -o "build/pkg/cs3/$bridge_subdir/$packaged" \
         "https://raw.githubusercontent.com/$bridge_repo/builds/$upstream"
     done < "$name/bridge-sources.txt"
   fi
+
   jar cf "$name.hiki" -C build/pkg .
 
   BUILT="$BUILT $name"
