@@ -43,6 +43,7 @@ class CastleProvider : HikariProvider {
     override val mainUrl = "https://api.hlowb.com"
     override val version = 2
     override val description = "Castle TV (Use VLC) — Indian movies & TV via the official Castle API."
+    override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE, HikariMediaType.SERIES)
 
     companion object {

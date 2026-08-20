@@ -60,6 +60,10 @@ abstract class Cs3BridgeProvider(
 
     override val description: String get() = "CloudStream plugin via Hikari's .cs3 bridge."
 
+    override val version: Int get() = 1
+
+    override val iconUrl: String? get() = null
+
     override val tvTypes: Set<HikariMediaType>
         get() = setOf(HikariMediaType.MOVIE, HikariMediaType.SERIES)
 

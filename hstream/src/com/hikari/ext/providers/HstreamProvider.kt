@@ -29,7 +29,11 @@ class HstreamProvider : HikariProvider {
     override val name = "HStream"
     override val mainUrl = "https://hstream.moe"
     override val description = "English subbed hentai in HD, FHD & 4K."
+    override val version = 1
+    override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
+
+    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
         private const val BASE = "https://hstream.moe"

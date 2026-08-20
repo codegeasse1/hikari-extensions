@@ -34,7 +34,11 @@ class OppaiProvider : HikariProvider {
     override val name = "Oppai Stream"
     override val mainUrl = "https://oppai.stream"
     override val description = "Hentai anime in HD & 4K — direct Blu-ray rips, many genres."
+    override val version = 1
+    override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
+
+    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
         private const val BASE = "https://oppai.stream"

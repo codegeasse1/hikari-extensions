@@ -30,7 +30,10 @@ class HanimetvProvider : HikariProvider {
     override val mainUrl = "https://hanime.tv"
     override val version = 8
     override val description = "Curated 720p/1080p hentai — new releases, trending and random."
+    override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
+
+    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     private data class RowSpec(val id: String, val label: String)
     private data class Card(val media: HikariMedia, val start: Int)

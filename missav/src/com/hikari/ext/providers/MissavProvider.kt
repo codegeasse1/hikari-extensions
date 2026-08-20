@@ -37,8 +37,11 @@ class MissavProvider : HikariProvider {
     override val name = "MissAV (JAV)"
     override val mainUrl = "https://missav.ws"
     override val description = "Free JAV — new releases, hot today, uncensored leaks and 100k+ genre videos."
+    override val iconUrl: String? = null
     override val tvTypes = setOf(HikariMediaType.MOVIE)
     override val version = 3
+
+    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
         private const val BASE = "https://missav.ws/en"
