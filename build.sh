@@ -11,7 +11,7 @@ mkdir -p "$DEPS"
 
 fetch() {
   local url="$1" file="$2"
-  [ -f "$DEPS/$file" ] || curl -fsSL -o "$DEPS/$file" "$url"
+  [ -f "$DEPS/$file" ] || curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$DEPS/$file" "$url"
 }
 
 fetch https://repo1.maven.org/maven2/com/google/android/android/4.1.1.4/android-4.1.1.4.jar android-4.1.1.4.jar
@@ -104,7 +104,7 @@ for dir in */; do
     while IFS=$'\t' read -r upstream packaged; do
       [ -z "$upstream" ] && continue
       packaged="${packaged:-$upstream}"
-      curl -fsSL -o "build/pkg/cs3/$bridge_subdir/$packaged" \
+      curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "build/pkg/cs3/$bridge_subdir/$packaged" \
         "https://raw.githubusercontent.com/$bridge_repo/builds/$(urlencode "$upstream")"
     done < "$name/bridge-sources.txt"
   fi
