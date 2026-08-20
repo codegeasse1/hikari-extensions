@@ -25,7 +25,7 @@ fetch https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization
 fetch https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.7.1/kotlinx-serialization-json-jvm-1.7.1.jar kotlinx-serialization-json-jvm-1.7.1.jar
 
 if [ ! -x "$KOTLINC_DIR/bin/kotlinc" ]; then
-  curl -fsSL -o kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v2.1.20/kotlin-compiler-2.1.20.zip
+  curl -fsSL -o kotlinc.zip https://github.com/JetBrains/kotlin/releases/download/v2.4.10/kotlin-compiler-2.4.10.zip
   unzip -q kotlinc.zip
 fi
 

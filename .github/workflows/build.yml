@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kotlinc
-          key: kotlinc-2.1.20
+          key: kotlinc-2.4.10
 
       - name: Build all extensions + repo.json
         run: |
