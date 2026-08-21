@@ -28,18 +28,18 @@ import java.net.URLEncoder
  *    {anineko, animegg, megaplay}, lang in {sub, dub, hsub}) returns
  *    `{slug, server, lang, sources[], headers, subtitles}` — or, on some
  *    servers, an object keyed by audioType with `sub`/`dub` entries carrying
- *    `sources` + `headers` + `tracks`. Sources play best through the site's
- *    own proxy: anineko → neko.justanime.to/m3u8-proxy, animegg →
- *    gg.justanime.to/proxy, megaplay → momo.justanime.to/proxy, anisnatch →
- *    as.justanime.to/m3u8-proxy, animelok → lok.justanime.to/proxy.
+ *    `sources` + `headers` + `tracks`. Sources are always played through the
+ *    site's own proxies (the CDNs hotlink-gate segments): each server's proxy
+ *    (neko/gg/momo/as/lok.justanime.to) plus the generic open fallbacks, so a
+ *    dead server proxy (e.g. neko) can't break playback.
  */
 class JustAnimeProvider : HikariProvider {
 
     override val id = "justanime"
     override val name = "JustAnime"
     override val mainUrl = "https://justanime.to"
-    override val description = "Anime from justanime.to — trending, popular, airing and upcoming rows, full episode lists, sub & dub, direct HLS via the site's own proxy."
-    override val version = 2
+    override val description = "Anime from justanime.to — trending, popular, airing and upcoming rows, full episode lists, sub & dub, direct HLS via the site's own proxies."
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
     companion object {
@@ -67,13 +67,31 @@ class JustAnimeProvider : HikariProvider {
             "favourite" to "Favourites",
         )
 
-        // (server key, proxy base for its streams)
-        private val servers = listOf(
-            "anineko" to "https://neko.justanime.to/m3u8-proxy",
-            "animegg" to "https://gg.justanime.to/proxy",
-            "megaplay" to "https://momo.justanime.to/proxy",
-            "anisnatch" to "https://as.justanime.to/m3u8-proxy",
-            "animelok" to "https://lok.justanime.to/proxy",
+        // (server key, its own proxy base — the site's player routes every
+        // stream through one of these. Some die (neko for anineko has been
+        // down for a while), which is why the site also keeps generic
+        // fallback proxies that relay any CDN URL.)
+        private val serverProxies = mapOf(
+            "anineko" to "https://neko.justanime.to/m3u8-proxy?url=",
+            "animegg" to "https://gg.justanime.to/proxy?url=",
+            "megaplay" to "https://momo.justanime.to/proxy?url=",
+            "anisnatch" to "https://as.justanime.to/m3u8-proxy?url=",
+            "animelok" to "https://lok.justanime.to/proxy?url=",
+        )
+
+        // Generic proxies verified reachable and open (momo/as relay any URL;
+        // gg has a CDN allowlist). Listed before the per-server hosts so
+        // playback survives a dead server proxy.
+        private val fallbackProxies = listOf(
+            "https://momo.justanime.to/proxy?url=",
+            "https://as.justanime.to/m3u8-proxy?url=",
+            "https://gg.justanime.to/proxy?url=",
+        )
+
+        // Headers for the request to the proxy hosts themselves.
+        private val justHeaders = mapOf(
+            "Referer" to "https://justanime.to/",
+            "Origin" to "https://justanime.to",
         )
 
         private val langs = listOf("sub", "dub", "hsub")
@@ -182,7 +200,7 @@ class JustAnimeProvider : HikariProvider {
         val streams = ArrayList<HikariStream>()
         for (lang in langs) {
             if (streams.size >= 12) break
-            for ((server, _) in servers) {
+            for (server in serverProxies.keys) {
                 val result = fetchWatch("$API/watch/$animeId/episode/$epNum/$server/$lang/hd1", server)
                     ?: fetchWatch("$API/watch/$animeId/episode/$epNum/$server/$lang", server)
                 if (result.isNullOrEmpty()) continue
@@ -219,7 +237,17 @@ class JustAnimeProvider : HikariProvider {
                 h.optString("Origin").takeIf { it.isNotBlank() }?.let { put("Origin", it) }
             }
         }
+        val headerJson = JSONObject(headers).toString()
         val subtitles = parseSubtitles(body.opt("tracks")) ?: parseSubtitles(body.opt("subtitles"))
+
+        // Every source is exposed through each proxy in the pool — the site
+        // never serves the CDN directly (it hotlink-gates segments, which is
+        // what makes a bare URL play a few seconds and then die). The generic
+        // open proxies come first so a dead server proxy doesn't break
+        // playback; the bare CDN is listed last as "Direct" as a last resort.
+        val pool = LinkedHashSet<String>()
+        fallbackProxies.forEach { pool.add(it) }
+        serverProxies[server]?.let { pool.add(it) }
 
         val out = ArrayList<HikariStream>()
         for (i in 0 until sources.length()) {
@@ -228,23 +256,15 @@ class JustAnimeProvider : HikariProvider {
             if (rawUrl.isBlank()) continue
             val isM3u8 = s.optBoolean("isM3U8", rawUrl.contains(".m3u8", true))
             val quality = s.optString("quality").takeIf { it.isNotBlank() } ?: "Auto"
-            val label = "$lang · $quality"
-            // The site's own player ALWAYS plays through its proxy (the CDNs
-            // hotlink-gate segments and inject ads through it). Put the proxy
-            // copy FIRST so auto-play uses the intended path; the bare CDN URL
-            // is a fallback (some servers' raw manifests are ad-only or
-            // Cloudflare-blocked for direct fetches).
-            val proxyBase = servers.firstOrNull { it.first == server }?.second
-            if (proxyBase != null) {
-                val headerJson = JSONObject(headers).toString()
+            val base = "$lang · $quality"
+            var n = 0
+            for (proxy in pool) {
+                n++
                 out.add(
                     HikariStream(
-                        name = "$label (proxy)",
-                        url = "$proxyBase?url=${encode(rawUrl)}&headers=${encode(headerJson)}",
-                        headers = mapOf(
-                            "Referer" to "https://justanime.to/",
-                            "Origin" to "https://justanime.to",
-                        ),
+                        name = if (n == 1) "$base · Proxy" else "$base · Proxy $n",
+                        url = proxy + encode(rawUrl) + "&headers=" + encode(headerJson),
+                        headers = justHeaders,
                         subtitles = subtitles,
                         isM3u8 = isM3u8,
                     )
@@ -252,7 +272,7 @@ class JustAnimeProvider : HikariProvider {
             }
             out.add(
                 HikariStream(
-                    name = label,
+                    name = "$base · Direct",
                     url = rawUrl,
                     headers = headers,
                     subtitles = subtitles,
