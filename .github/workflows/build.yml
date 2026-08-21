@@ -56,7 +56,9 @@ jobs:
           name: hiki
           path: |
             *.hiki
+            *.jar
             repo.json
+            repo-desktop.json
           if-no-files-found: error
 
       - name: Publish to continuous release
@@ -65,9 +67,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload continuous *.hiki repo.json --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload continuous *.hiki *.jar repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create continuous *.hiki repo.json --repo "$GITHUB_REPOSITORY" \
+            gh release create continuous *.hiki *.jar repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" \
               --title "Continuous build" \
               --notes "Hikari extensions + repo.json, auto-built from main." || true
           fi
@@ -82,6 +84,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin builds >/dev/null 2>&1 && git checkout builds 2>/dev/null || git checkout --orphan builds
           cp /tmp/repo.json repo.json
+          cp repo-desktop.json /tmp/repo-desktop.json
           git add repo.json
           git commit -m "repo: update repo.json $(date -u +%Y%m%d%H%M)" || true
           git push origin builds --force
