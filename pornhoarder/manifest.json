@@ -1,6 +1,6 @@
 {
   "name": "PornHoarder",
-  "version": 2,
+  "version": 3,
   "mainClass": "com.hikari.ext.providers.PornhoarderProvider",
   "tvTypes": ["movie"]
 }

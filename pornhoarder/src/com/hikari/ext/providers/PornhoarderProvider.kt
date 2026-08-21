@@ -37,7 +37,7 @@ class PornhoarderProvider : HikariProvider {
     override val name = "PornHoarder"
     override val mainUrl = "https://pornhoarder.st"
     override val description = "Pornhoarder.tv mirrors — latest, trending and search with HTTP-resolved playback from lulustream/streamtape/etc."
-    override val version = 2
+    override val version = 3
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -61,6 +61,13 @@ class PornhoarderProvider : HikariProvider {
         private const val PACKED_OPEN = "function(p,a,c,k,e,d)"
         private const val PACKED_MID = "return p}("
         private const val BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+        // player.php gates the real player behind a "Press to play" form
+        // (`#form-button-click`); submitting it is what reveals the host iframe
+        // whose video request we capture. Native form.submit() needs no jQuery.
+        private const val CLICK_PLAY_SCRIPT =
+            "(function(){try{var f=document.getElementById('form-button-click');" +
+                "if(f){f.submit();return;}var b=document.getElementById('play-button');if(b){b.click();}}catch(e){}})();"
     }
 
     override fun catalogs(): List<HikariCatalog> = listOf(
@@ -111,77 +118,88 @@ class PornhoarderProvider : HikariProvider {
         val pageUrl = media.id.takeIf { it.startsWith("http") } ?: return emptyList()
         val html = getCached(pageUrl) ?: return emptyList()
 
-        // Every host appears both as the main player.php hash (iframe) and as
-        // a `.video-detail-servers` link. Collect them all, dedupe.
-        val hashes = LinkedHashSet<String>()
-        Regex("""player\.php\?video=([A-Za-z0-9+/=]+)""").findAll(html).forEach {
-            hashes.add(it.groupValues[1])
-        }
-        Regex("""<a href='/pornvideo/[^']+/([A-Za-z0-9+/=]+)' title='Watch this video on [^']+'>""")
-            .findAll(html).forEach {
-                hashes.add(it.groupValues[1])
-            }
-        if (hashes.isEmpty()) return emptyList()
+        // The video page's own player hash, plus every host listed as a
+        // `/pornvideo/<slug>/<hash>/` link. Each of those server pages carries
+        // its OWN player.php hash (different from the link hash), so resolve
+        // the pages to get the real player URLs.
+        val mainHash = Regex("""player\.php\?video=([A-Za-z0-9+/=]+)""").find(html)?.groupValues?.get(1)
+        val servers = Regex("""<a href='/pornvideo/([^']+?)/([A-Za-z0-9+/=]+)' title='Watch this video on ([^']+)'>""")
+            .findAll(html).map { Triple(it.groupValues[1], it.groupValues[2], it.groupValues[3].trim()) }
+            .toList()
 
-        // Resolve each host hash to its actual host page via download.php.
+        val playerUrls = LinkedHashMap<String, String>() // playerHash -> server label
+        if (mainHash != null) playerUrls[mainHash] = ""
+        for ((slug, urlHash, label) in servers) {
+            if (playerUrls.size >= 5) break
+            val serverPage = getCached("$BASE/pornvideo/$slug/$urlHash/") ?: continue
+            val h = Regex("""player\.php\?video=([A-Za-z0-9+/=]+)""").find(serverPage)?.groupValues?.get(1)
+            if (h != null) playerUrls.putIfAbsent(h, label)
+        }
+        if (playerUrls.isEmpty()) return emptyList()
+
+        // download.php resolves a hash to its actual host page (lulustream /
+        // vidhide-family pages unpack straight to the m3u8 over plain HTTP).
         val hostUrls = ArrayList<String>()
-        for (hash in hashes) {
-            if (hostUrls.size >= 6) break
-            // download.php does a literal comparison of the raw query value,
-            // so pass the base64 hash unencoded (the site's own links do too).
-            val dl = getCached("$DL/download.php?video=$hash") ?: continue
-            val durl = Regex("""var durl = "([^"]+)"""").find(dl)?.groupValues?.get(1) ?: continue
-            val hostUrl = HikariNet.base64Decode(durl)
+        if (mainHash != null) {
+            val dl = getCached("$DL/download.php?video=$mainHash")
+            val durl = dl?.let { Regex("""var durl = "([^"]+)"""").find(it)?.groupValues?.get(1) }
+            durl?.let { HikariNet.base64Decode(it) }
                 ?.let { String(it, Charsets.UTF_8) }
-                ?.takeIf { it.startsWith("http") }
-                ?: continue
-            if (isDailymotion(hostUrl)) continue // banned in some countries — skip outright
-            hostUrls.add(hostUrl)
+                ?.takeIf { it.startsWith("http") && !isDailymotion(it) }
+                ?.let { hostUrls.add(it) }
         }
 
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
         val started = System.currentTimeMillis()
-        for (hostUrl in hostUrls) {
-            if (out.size >= 6) break
-            if (System.currentTimeMillis() - started > 60_000) break
+        fun add(u: String, name: String, referer: String) {
+            if (u.isBlank() || isDailymotion(u) || !seen.add(u)) return
+            out.add(
+                HikariStream(
+                    name = name,
+                    url = u,
+                    headers = mapOf("Referer" to referer),
+                    isM3u8 = u.contains(".m3u8", ignoreCase = true),
+                )
+            )
+        }
 
-            // 1) HTTP resolution — the host page (or its packed script) usually
-            //    contains the m3u8/mp4 directly.
+        // 1) Cheap HTTP unpack of the host page (lulustream/vidhide-family).
+        for (hostUrl in hostUrls) {
+            if (out.size >= 4) break
             val hostHtml = HikariNet.getStringSmart(hostUrl, pageHeaders + mapOf("Referer" to pageUrl))
             if (hostHtml != null) {
                 for (u in extractStreamUrls(hostHtml, hostUrl)) {
-                    if (isDailymotion(u)) continue
-                    if (!seen.add(u)) continue
-                    out.add(
-                        HikariStream(
-                            name = "Server ${out.size + 1}",
-                            url = u,
-                            headers = mapOf("Referer" to hostUrl),
-                            isM3u8 = u.contains(".m3u8", ignoreCase = true),
-                        )
-                    )
+                    add(u, "Server ${out.size + 1}", hostUrl)
                 }
+                extractStreamTape(hostHtml)?.let { add(it, "Server ${out.size + 1}", hostUrl) }
             }
-            if (out.size >= 6) break
+            if (out.isNotEmpty()) break
+        }
 
-            // 2) WebView fallback for JS-only hosts.
-            val hits = try {
-                HikariNet.resolveWithWebView(hostUrl, streamCapture, timeoutMs = 30_000)
-            } catch (t: Throwable) {
-                continue
-            }
-            for (h in hits) {
-                val u = h.url
-                if (u.isBlank() || isDailymotion(u) || !seen.add(u)) continue
-                out.add(
-                    HikariStream(
-                        name = "Server ${out.size + 1}",
-                        url = u,
-                        headers = h.headers + mapOf("Referer" to hostUrl),
-                        isM3u8 = u.contains(".m3u8", ignoreCase = true),
+        // 2) The site's own player pages in a WebView, clicking the play gate
+        //    (`#form-button-click`). The host iframe that page loads fires the
+        //    real m3u8/mp4 request (lulustream, streamtape, mixdrop…) — exactly
+        //    what a browser would play, cookies and all.
+        if (out.isEmpty()) {
+            for ((hash, label) in playerUrls) {
+                if (out.size >= 4) break
+                if (System.currentTimeMillis() - started > 120_000) break
+                val name = if (label.isBlank()) "Server ${out.size + 1}" else "Server · $label"
+                val hits = try {
+                    HikariNet.resolveWithWebView(
+                        "$DL/player.php?video=$hash",
+                        streamCapture,
+                        timeoutMs = 35_000,
+                        script = CLICK_PLAY_SCRIPT,
                     )
-                )
+                } catch (t: Throwable) {
+                    continue
+                }
+                for (h in hits) {
+                    add(h.url, name, h.headers["Referer"] ?: "$DL/")
+                }
+                if (out.isNotEmpty()) break
             }
         }
         return out
@@ -284,6 +302,30 @@ class PornhoarderProvider : HikariProvider {
         for (u in abs + rel) if (u.contains(".m3u8", ignoreCase = true)) all.add(u)
         for (u in abs + rel) if (!u.contains(".m3u8", ignoreCase = true)) all.add(u)
         return all.toList()
+    }
+
+    /**
+     * StreamTape embeds hide the file in `<div id="ideoolink" style="display:none;">
+     * /streamtape.com/get_video?id=…&expires=…&ip=…&token=…</div>`. That URL
+     * 302-redirects to the real `*.tapecontent.net/…mp4?stream=1` file, which
+     * the player follows transparently, so it is exposed as the stream.
+     */
+    private fun extractStreamTape(embedHtml: String): String? {
+        for (id in listOf("ideoolink", "robotlink", "botlink")) {
+            val raw = Regex("""<div[^>]*id=["']$id["'][^>]*>([^<]*)</div>""")
+                .find(embedHtml)?.groupValues?.get(1)
+                ?: continue
+            val v = raw.trim()
+            if (v.isBlank()) continue
+            val u = when {
+                v.startsWith("http") -> v
+                v.startsWith("/streamtape.com/") -> "https://streamtape.com" + v.removePrefix("/streamtape.com")
+                v.startsWith("/") -> "https://streamtape.com$v"
+                else -> continue
+            }
+            if (u.contains("/get_video?")) return u
+        }
+        return null
     }
 
     // ------------------------------------------------------------------

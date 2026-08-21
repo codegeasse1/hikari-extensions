@@ -33,7 +33,7 @@ class LeakPornerProvider : HikariProvider {
     override val name = "LeakPorner"
     override val mainUrl = "https://leakporner.org"
     override val description = "Leaked/OF adult videos from leakporner.org — latest uploads, search and multi-server HTTP-resolved playback."
-    override val version = 2
+    override val version = 3
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -111,49 +111,46 @@ class LeakPornerProvider : HikariProvider {
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
         val started = System.currentTimeMillis()
-        for (embed in embeds) {
-            if (out.size >= 4) break
-            if (System.currentTimeMillis() - started > 60_000) break
+        fun add(u: String, referer: String) {
+            if (u.isBlank() || !seen.add(u)) return
+            out.add(
+                HikariStream(
+                    name = "Server ${out.size + 1}",
+                    url = u,
+                    headers = mapOf("Referer" to referer),
+                    isM3u8 = u.contains(".m3u8", ignoreCase = true),
+                )
+            )
+        }
 
-            // 1) HTTP resolution — the embed's own HTML (or its packed script)
-            //    usually contains the m3u8/mp4 directly.
+        for (embed in embeds) {
+            if (out.size >= 5) break
+            if (System.currentTimeMillis() - started > 90_000) break
+
+            // 1) HTTP resolution — the embed's own HTML, its Dean Edwards
+            //    packed script (luluvids/vidhide-family m3u8s), or its
+            //    streamtape `ideoolink` div usually contain the stream.
             val embedHtml = HikariNet.getStringSmart(
                 embed,
                 pageHeaders + mapOf("Referer" to pageUrl, "X-Requested-With" to "XMLHttpRequest"),
             )
             if (embedHtml != null) {
-                for (u in extractStreamUrls(embedHtml, embed)) {
-                    if (!seen.add(u)) continue
-                    out.add(
-                        HikariStream(
-                            name = "Server ${out.size + 1}",
-                            url = u,
-                            headers = mapOf("Referer" to embed),
-                            isM3u8 = u.contains(".m3u8", ignoreCase = true),
-                        )
-                    )
-                }
+                for (u in extractStreamUrls(embedHtml, embed)) add(u, embed)
+                extractStreamTape(embedHtml)?.let { add(it, embed) }
             }
-            if (out.size >= 4) break
+            if (out.size >= 5) break
 
-            // 2) WebView fallback for JS-driven players (React SPAs, captchas…).
+            // 2) WebView fallback for JS-only players (React SPAs, iamcdn…).
+            //    DoodStream/PlayMogo embeds are Turnstile-captcha gated even
+            //    in a real browser, so skip the wasted WebView for those.
+            if (isDoodCaptchaHost(embed)) continue
+            if (System.currentTimeMillis() - started > 90_000) break
             val hits = try {
-                HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 30_000)
+                HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 20_000)
             } catch (t: Throwable) {
                 continue
             }
-            for (h in hits) {
-                val u = h.url
-                if (u.isBlank() || !seen.add(u)) continue
-                out.add(
-                    HikariStream(
-                        name = "Server ${out.size + 1}",
-                        url = u,
-                        headers = h.headers + mapOf("Referer" to embed),
-                        isM3u8 = u.contains(".m3u8", ignoreCase = true),
-                    )
-                )
-            }
+            for (h in hits) add(h.url, embed)
         }
         return out
     }
@@ -250,6 +247,36 @@ class LeakPornerProvider : HikariProvider {
         for (u in abs + rel) if (u.contains(".m3u8", ignoreCase = true)) all.add(u)
         for (u in abs + rel) if (!u.contains(".m3u8", ignoreCase = true)) all.add(u)
         return all.toList()
+    }
+
+    /** True for DoodStream-family hosts whose embeds are Turnstile-captcha gated. */
+    private fun isDoodCaptchaHost(embed: String): Boolean {
+        val host = embed.substringAfter("://").substringBefore("/").lowercase()
+        return host.contains("playmogo") || host.contains("dood")
+    }
+
+    /**
+     * StreamTape embeds hide the file in `<div id="ideoolink" style="display:none;">
+     * /streamtape.com/get_video?id=…&expires=…&ip=…&token=…</div>`. That URL
+     * 302-redirects to the real `*.tapecontent.net/…mp4?stream=1` file, which
+     * the player follows transparently, so it is exposed as the stream.
+     */
+    private fun extractStreamTape(embedHtml: String): String? {
+        for (id in listOf("ideoolink", "robotlink", "botlink")) {
+            val raw = Regex("""<div[^>]*id=["']$id["'][^>]*>([^<]*)</div>""")
+                .find(embedHtml)?.groupValues?.get(1)
+                ?: continue
+            val v = raw.trim()
+            if (v.isBlank()) continue
+            val u = when {
+                v.startsWith("http") -> v
+                v.startsWith("/streamtape.com/") -> "https://streamtape.com" + v.removePrefix("/streamtape.com")
+                v.startsWith("/") -> "https://streamtape.com$v"
+                else -> continue
+            }
+            if (u.contains("/get_video?")) return u
+        }
+        return null
     }
 
     // ------------------------------------------------------------------

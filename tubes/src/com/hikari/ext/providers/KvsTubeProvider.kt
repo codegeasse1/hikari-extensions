@@ -117,32 +117,46 @@ abstract class KvsTubeProvider : HikariProvider {
         val id = media.id.trim()
         if (!id.all { it.isDigit() }) return emptyList()
 
-        // url -> quality label, merged from the embed page AND the full video
-        // page (the full page carries the higher-res `video_alt_url*` files).
+        // url -> quality label. The FULL video page is the authoritative source
+        // list: KVS server-renders every <source> it can serve there (WowXxx
+        // carries 2160p/720p/480p `<source>` tags) plus a signed download file,
+        // while the embed page only ever holds the lowest tier (`video_url`).
         val urls = LinkedHashMap<String, String>()
+        fun put(u: String, label: String) {
+            val key = u.substringBefore('?').trimEnd('/')
+            if (key.isBlank() || key in urls) return
+            urls[key] = label
+        }
         fun collect(fv: String) {
             for (key in listOf("video_url", "video_alt_url", "video_alt_url2", "video_alt_url3")) {
                 val u = flashvarString(fv, key)
                     ?.takeIf { it.startsWith("http") && it.contains("/get_file/") } ?: continue
                 val label = flashvarString(fv, "${key}_text")
                     ?.takeIf { it.isNotBlank() } ?: "Video"
-                urls[u] = label
+                put(u, label)
             }
         }
 
         val embedPage = getCached("$base/embed/$id")
-        if (embedPage != null) flashvarsBlock(embedPage)?.let { collect(it) }
+        val embedFv = embedPage?.let { flashvarsBlock(it) }
 
-        if (urls.size < 2) {
-            val pageUrl = embedPage?.let { p ->
-                flashvarsBlock(p)?.let { fv ->
-                    listOf("video_alt_url", "video_alt_url2", "video_alt_url3")
-                        .mapNotNull { flashvarString(fv, it) }
-                        .firstOrNull { it.startsWith("http") && !it.contains("/get_file/") }
-                }
-            } ?: "$base/$videoPath/$id"
-            getCached(pageUrl)?.let { p -> flashvarsBlock(p)?.let { collect(it) } }
+        // The embed's `video_alt_url` on WowXxx is a redirect to the video page
+        // (not a file), so use it to locate the full page; fall back to the id.
+        val pageUrl = embedFv?.let { fv ->
+            listOf("video_alt_url", "video_alt_url2", "video_alt_url3")
+                .mapNotNull { flashvarString(fv, it) }
+                .firstOrNull { it.startsWith("http") && !it.contains("/get_file/") }
+        } ?: "$base/$videoPath/$id"
+        val videoPage = getCached(pageUrl)
+
+        if (videoPage != null) {
+            for ((src, label) in sourceTags(videoPage)) put(src, label)
+            flashvarsBlock(videoPage)?.let { collect(it) }
+            val dl = Regex("""href="(https?://[^"]*/get_file/[^"?]+)""")
+                .find(videoPage)?.groupValues?.get(1)
+            if (dl != null) put(dl, "Download")
         }
+        if (embedFv != null) collect(embedFv)
         if (urls.isEmpty()) return emptyList()
 
         return urls.map { (u, label) ->
@@ -222,6 +236,21 @@ abstract class KvsTubeProvider : HikariProvider {
     private fun flashvarString(flashvars: String, key: String): String? =
         Regex("""\b$key:\s*'([^']*)'""").find(flashvars)?.groupValues?.get(1)
 
+    /** The server-rendered `<source src='…get_file…' label="…">` tags (WowXxx). */
+    private fun sourceTags(html: String): List<Pair<String, String>> {
+        val out = ArrayList<Pair<String, String>>()
+        for (tag in Regex("""<source[^>]*>""").findAll(html)) {
+            val t = tag.value
+            val src = Regex("""\bsrc=['"]([^'"]+)['"]""").find(t)?.groupValues?.get(1)
+                ?: continue
+            if (!src.startsWith("http")) continue
+            val label = Regex("""\blabel=["']([^"']+)["']""").find(t)?.groupValues?.get(1)
+                ?: "Video"
+            out.add(src to label)
+        }
+        return out
+    }
+
     private fun unescapeEntities(s: String): String = s
         .replace("&quot;", "\"")
         .replace("&#039;", "'")
@@ -295,7 +324,7 @@ class WowXxxProvider : KvsTubeProvider() {
     override val name = "WowXxx"
     override val mainUrl = "https://www.wowxxx.to"
     override val description = "Premium-site porn rehosts (Brazzers, MYLF, KINK, TUSHY…). Direct MP4 streams."
-    override val version = 2
+    override val version = 3
 
     override val base = "https://www.wowxxx.to"
     override val videoPath = "videos"

@@ -41,7 +41,7 @@ class Krx18Provider : HikariProvider {
     override val mainUrl = "https://krx18.com"
     override val description = "Erotic/JAV movies, DooPlay-powered, with multi-server JWPlayer embeds."
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
-    override val version = 3
+    override val version = 4
 
     companion object {
         private const val BASE = "https://krx18.com"
@@ -157,24 +157,20 @@ class Krx18Provider : HikariProvider {
 
     /**
      * Resolves one server's embed to playable streams. The 9stream
-     * (play.playkrx18.site) server is decrypted over plain HTTP; unknown embed
-     * hosts fall back to the WebView capture. Loadvid and mov18plus embeds are
-     * skipped outright: loadvid's manifest is fetched as blob content by its
-     * own JS (never a capturable URL), and mov18plus redirects away unless it
-     * is embedded in an iframe — so their WebView attempts can only burn time.
+     * (play.playkrx18.site) server is decrypted over plain HTTP first; when the
+     * API refuses (geo/domain blocks) every embed — including loadvid and
+     * mov18plus — is captured in a WebView instead, where the site's own JS
+     * runs and fires the m3u8/mp4 request a browser would.
      */
     private suspend fun resolveEmbed(embed: String, label: String): List<HikariStream> {
         if (embed.contains("playkrx18.site", ignoreCase = true)) {
             val direct = resolvePlaykrx18(embed)
             if (direct.isNotEmpty()) return direct
+            // API blocked/geo-refused — fall through to the WebView capture.
         }
-        if (embed.contains("loadvid.com", ignoreCase = true) ||
-            embed.contains("mov18plus.cloud", ignoreCase = true)
-        ) {
-            return emptyList()
-        }
+        val timeout = if (embed.contains("loadvid.com", ignoreCase = true)) 60_000L else 45_000L
         return try {
-            HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 45_000).map { h ->
+            HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = timeout).map { h ->
                 HikariStream(
                     name = if (label.isBlank()) "Server" else "Server · $label",
                     url = h.url,

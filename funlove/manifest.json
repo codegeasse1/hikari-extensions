@@ -1,6 +1,6 @@
 {
   "name": "FunLove",
-  "version": 3,
+  "version": 4,
   "mainClass": "com.hikari.ext.providers.FunloveProvider",
   "tvTypes": ["movie"]
 }

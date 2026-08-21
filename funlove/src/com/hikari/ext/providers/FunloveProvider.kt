@@ -33,7 +33,7 @@ class FunloveProvider : HikariProvider {
     override val name = "FunLove"
     override val mainUrl = "https://funlove.info"
     override val description = "Exclusive FC2PPV / JAV from funlove.info — new, popular and top-viewed rows, movies archive and search."
-    override val version = 3
+    override val version = 4
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -268,6 +268,15 @@ class FunloveProvider : HikariProvider {
         // <iframe src="..."> inside any string value.
         val iframe = Regex("""<iframe[^>]*src=["'](https?://[^"']+)""").find(body)?.groupValues?.get(1)
         if (iframe != null) add("Server ${found.size + 1}", iframe)
+
+        // Defensive sweep over the raw body: the response has been seen nesting
+        // the m3u8 in odd spots (double-encoded strings, array-of-arrays, etc.)
+        // that the structured walk above misses.
+        for (m in Regex("""https?://[^"'\s>]+?\.m3u8[^"'\s>]*""").findAll(body)) {
+            val u = m.value.trim().trimEnd('\\', '"', '\'')
+            if (u.isBlank() || !looksLikeHls(u)) continue
+            add("Server ${found.size + 1}", u)
+        }
 
         // m3u8 servers first (adaptive + seek-friendly), then the rest.
         val out = ArrayList<Pair<String, String>>()

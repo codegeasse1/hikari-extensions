@@ -34,7 +34,7 @@ class Porn4fansProvider : HikariProvider {
     override val name = "Porn4Fans"
     override val mainUrl = "https://de.porn4fans.com"
     override val description = "Leaked/OF adult videos from de.porn4fans.com — latest, popular, categories and search, with signed MP4 playback."
-    override val version = 1
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -129,8 +129,20 @@ class Porn4fansProvider : HikariProvider {
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
 
+        // Cloudflare sometimes hands the plain HTTP client a degraded page
+        // (480p-only config); the fully rendered page carries the alt ladder.
+        var page = html
+        if (extractConfigStreams(html).size < 2) {
+            val rendered = try {
+                HikariNet.getStringRendered(pageUrl, timeoutMs = 30_000)
+            } catch (t: Throwable) {
+                null
+            }
+            if (rendered != null && rendered.length > 3000) page = rendered
+        }
+
         // Signed MP4s straight from the page's own player config.
-        for ((label, u) in extractConfigStreams(html)) {
+        for ((label, u) in extractConfigStreams(page)) {
             if (u.isBlank() || !seen.add(u)) continue
             out.add(
                 HikariStream(
