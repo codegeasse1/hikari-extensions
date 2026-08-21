@@ -1,0 +1,90 @@
+name: Build extensions
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache kotlinc
+        uses: actions/cache@v4
+        with:
+          path: kotlinc
+          key: kotlinc-2.4.10
+
+      - name: Build all extensions + repo.json
+        run: |
+          set -o pipefail
+          bash build.sh > build.log 2>&1
+          code=$?
+          echo "build exit code = $code"
+          if [ $code -ne 0 ]; then
+            echo "==== TAIL OF BUILD LOG ===="
+            tail -n 150 build.log
+            echo "==== KOTLIN ERRORS ===="
+            grep -E "^e: " build.log | head -n 40 || true
+            echo "==== KOTLINC/GRADLE ERRORS ===="
+            grep -E "error:|exception|FAILURE" build.log | head -n 40 || true
+          fi
+          exit $code
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Upload artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hiki
+          path: |
+            *.hiki
+            *.jar
+            repo.json
+            repo-desktop.json
+          if-no-files-found: error
+
+      - name: Publish to continuous release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload continuous *.hiki *.jar repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create continuous *.hiki *.jar repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" \
+              --title "Continuous build" \
+              --notes "Hikari extensions + repo.json, auto-built from main." || true
+          fi
+
+      - name: Publish repo.json to builds branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp repo.json /tmp/repo.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin builds >/dev/null 2>&1 && git checkout builds 2>/dev/null || git checkout --orphan builds
+          cp /tmp/repo.json repo.json
+          cp repo-desktop.json /tmp/repo-desktop.json
+          git add repo.json
+          git commit -m "repo: update repo.json $(date -u +%Y%m%d%H%M)" || true
+          git push origin builds --force

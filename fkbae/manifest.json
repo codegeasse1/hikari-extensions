@@ -1,0 +1,6 @@
+{
+  "name": "FkBAE",
+  "version": 4,
+  "mainClass": "com.hikari.ext.providers.FkbaeProvider",
+  "tvTypes": ["movie"]
+}

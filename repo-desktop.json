@@ -1,0 +1,78 @@
+{
+  "name": "Hikari Extensions (desktop)",
+  "description": "Official .jar extensions for Hikari Desktop.",
+  "plugins": [
+    {
+      "name": "Castle TV",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/castle.jar",
+      "version": 3,
+      "tvTypes": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "name": "Chaturbate (Hikari)",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.jar",
+      "version": 3
+    },
+    {
+      "name": "CNC Verse",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse.jar",
+      "version": 2,
+      "tvTypes": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "name": "Hanime1",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.jar",
+      "version": 5
+    },
+    {
+      "name": "HanimeTV",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.jar",
+      "version": 9
+    },
+    {
+      "name": "HStream",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hstream.jar",
+      "version": 3
+    },
+    {
+      "name": "MissAV (JAV)",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.jar",
+      "version": 4
+    },
+    {
+      "name": "Oppai Stream",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.jar",
+      "version": 3
+    },
+    {
+      "name": "Phisher",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher.jar",
+      "version": 2,
+      "tvTypes": [
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "name": "WatchHentai",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.jar",
+      "version": 5
+    }
+  ]
+}
