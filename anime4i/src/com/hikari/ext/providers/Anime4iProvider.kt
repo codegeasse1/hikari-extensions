@@ -22,19 +22,21 @@ import java.net.URLEncoder
  *  - Series pages (`/anime/<slug>`) server-render the full episode list in
  *    `.epcheck .eplister`; episode/watch pages render the same list as an
  *    `.as-episode-module` number grid and embed the player as base64 in the
- *    `data-default-embed` attribute.
- *  - Streams: decode the embed → dailymotion access id →
+ *    `data-default-embed` attribute and in a `<select class="mirror">` whose
+ *    options are base64 iframes, one per server (Dailymotion, Okru, …).
+ *  - Streams per server: decode the embed → dailymotion access id →
  *    `player/metadata/video/<id>` → `qualities.auto[].url` (a signed HLS
- *    manifest). The signature is bound to the IP that asked for the metadata,
- *    which is the device itself, so playback is direct (no WebView needed).
+ *    manifest); or an ok.ru `videoembed/<id>` page whose embedded JSON carries
+ *    a signed `hlsManifestUrl`. Both signatures are bound to the IP that asked
+ *    for them (the device itself), so playback is direct (no WebView needed).
  */
 class Anime4iProvider : HikariProvider {
 
     override val id = "anime4i"
     override val name = "Anime4i"
     override val mainUrl = "https://anime4i.com"
-    override val description = "Chinese anime / donghua from anime4i.com — latest episodes, popular, genre browsing, full episode lists, direct HLS via the site's Dailymotion player."
-    override val version = 1
+    override val description = "Chinese anime / donghua from anime4i.com — latest episodes, popular, genre browsing, full episode lists, direct HLS from the Dailymotion and Okru servers."
+    override val version = 2
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
     companion object {
@@ -63,6 +65,13 @@ class Anime4iProvider : HikariProvider {
             "Accept" to "application/json, text/plain, */*",
             "Referer" to "https://www.dailymotion.com/",
             "Origin" to "https://www.dailymotion.com",
+        )
+
+        private val okruHeaders = mapOf(
+            "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
+            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Referer" to "https://ok.ru/",
+            "Origin" to "https://ok.ru",
         )
 
         // The site's own player URL for a video — grabs the access id.
@@ -191,59 +200,132 @@ class Anime4iProvider : HikariProvider {
             ?: media.id.takeIf { it.startsWith("http") }
             ?: return emptyList()
         val html = getCached(pageUrl) ?: return emptyList()
-        val b64 = Regex("""data-default-embed="([^"]+)""").find(html)?.groupValues?.get(1) ?: return emptyList()
-        val embed = HikariNet.base64Decode(b64)?.toString(Charsets.UTF_8) ?: return emptyList()
-        val embedSrc = Regex("""src="([^"]+)""").find(embed)?.groupValues?.get(1) ?: return emptyList()
 
-        if (embedSrc.contains("dailymotion", ignoreCase = true)) {
-            val accessId = embedSrcRe.find(embedSrc)?.groupValues?.get(1) ?: return emptyList()
-            val metaJson = HikariNet.getString(
-                "https://www.dailymotion.com/player/metadata/video/$accessId", dmHeaders
-            ) ?: return emptyList()
-            val meta = runCatching { JSONObject(metaJson) }.getOrNull() ?: return emptyList()
-            val qualities = meta.optJSONObject("qualities") ?: return emptyList()
-            val out = ArrayList<HikariStream>()
-            val seen = HashSet<String>()
-            val keys = qualities.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val arr = qualities.optJSONArray(key) ?: continue
-                for (i in 0 until arr.length()) {
-                    val q = arr.optJSONObject(i) ?: continue
-                    val u = q.optString("url").trim()
-                    if (u.isBlank() || !seen.add(u)) continue
-                    val isM3u8 = u.contains(".m3u8", ignoreCase = true) || q.optString("type").contains("mpegURL", true)
+        // The watch page's server selector: a `<select class="mirror">` whose
+        // `<option>` values are base64-encoded iframes, one per server
+        // (Dailymotion, Okru, …). `data-default-embed` is just the first one.
+        val embeds = ArrayList<Pair<String, String>>() // (server name, iframe src)
+        val mirror = Regex("""<select[^>]*class="[^"]*mirror[^"]*"[^>]*>([\s\S]*?)</select>""")
+            .find(html)?.groupValues?.get(1)
+        if (mirror != null) {
+            for (opt in Regex("""<option[^>]*value="([^"]+)"[^>]*>\s*([^<]*)""").findAll(mirror)) {
+                val name = opt.groupValues[2].trim().ifBlank { "Server" }
+                val dec = HikariNet.base64Decode(opt.groupValues[1])?.toString(Charsets.UTF_8) ?: continue
+                val src = Regex("""\bsrc="([^"]+)""").find(dec)?.groupValues?.get(1) ?: continue
+                if (src.startsWith("http")) embeds.add(name to src)
+            }
+        }
+        if (embeds.isEmpty()) {
+            val b64 = Regex("""data-default-embed="([^"]+)""").find(html)?.groupValues?.get(1) ?: return emptyList()
+            val embed = HikariNet.base64Decode(b64)?.toString(Charsets.UTF_8) ?: return emptyList()
+            val src = Regex("""\bsrc="([^"]+)""").find(embed)?.groupValues?.get(1) ?: return emptyList()
+            if (src.startsWith("http")) embeds.add("Server" to src)
+        }
+
+        val out = ArrayList<HikariStream>()
+        val seen = HashSet<String>()
+        for ((name, embedSrc) in embeds) {
+            if (embedSrc.contains("dailymotion", ignoreCase = true)) {
+                for (s in resolveDailymotion(embedSrc)) {
+                    if (s.url.isBlank() || !seen.add(s.url)) continue
+                    out.add(s)
+                }
+            } else if (embedSrc.contains("ok.ru", ignoreCase = true)) {
+                val u = resolveOkru(embedSrc)
+                if (u != null && seen.add(u)) {
                     out.add(
                         HikariStream(
-                            name = "Dailymotion · ${if (key == "auto") "Auto" else key}",
+                            name = "$name · HLS",
                             url = u,
-                            headers = mapOf(
-                                "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
-                                "Referer" to "https://www.dailymotion.com/",
-                            ),
-                            isM3u8 = isM3u8,
+                            headers = okruHeaders,
+                            isM3u8 = true,
+                        )
+                    )
+                }
+            } else {
+                // Unknown embed host — capture the stream via WebView.
+                val hits = try {
+                    HikariNet.resolveWithWebView(embedSrc, streamCapture, timeoutMs = 30_000)
+                } catch (t: Throwable) {
+                    continue
+                }
+                for (h in hits) {
+                    if (h.url.isBlank() || !seen.add(h.url)) continue
+                    out.add(
+                        HikariStream(
+                            name = "$name · Stream",
+                            url = h.url,
+                            headers = h.headers,
+                            isM3u8 = h.url.contains(".m3u8", ignoreCase = true),
                         )
                     )
                 }
             }
-            return out
         }
-
-        // Non-Dailymotion embed (backup servers): capture the stream via WebView.
-        return try {
-            HikariNet.resolveWithWebView(embedSrc, streamCapture, timeoutMs = 30_000)
-                .map { h ->
-                    HikariStream(
-                        name = "Stream",
-                        url = h.url,
-                        headers = h.headers,
-                        isM3u8 = h.url.contains(".m3u8", ignoreCase = true),
-                    )
-                }
-        } catch (t: Throwable) {
-            emptyList()
-        }
+        return out
     }
+
+    /** Dailymotion embed → access id → metadata API → signed HLS manifest. */
+    private suspend fun resolveDailymotion(embedSrc: String): List<HikariStream> {
+        val accessId = embedSrcRe.find(embedSrc)?.groupValues?.get(1) ?: return emptyList()
+        val metaJson = HikariNet.getString(
+            "https://www.dailymotion.com/player/metadata/video/$accessId", dmHeaders
+        ) ?: return emptyList()
+        val meta = runCatching { JSONObject(metaJson) }.getOrNull() ?: return emptyList()
+        val qualities = meta.optJSONObject("qualities") ?: return emptyList()
+        val out = ArrayList<HikariStream>()
+        val seen = HashSet<String>()
+        val keys = qualities.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val arr = qualities.optJSONArray(key) ?: continue
+            for (i in 0 until arr.length()) {
+                val q = arr.optJSONObject(i) ?: continue
+                val u = q.optString("url").trim()
+                if (u.isBlank() || !seen.add(u)) continue
+                val isM3u8 = u.contains(".m3u8", ignoreCase = true) || q.optString("type").contains("mpegURL", true)
+                out.add(
+                    HikariStream(
+                        name = "Dailymotion · ${if (key == "auto") "Auto" else key}",
+                        url = u,
+                        headers = mapOf(
+                            "User-Agent" to HikariNet.browserHeaders["User-Agent"].orEmpty(),
+                            "Referer" to "https://www.dailymotion.com/",
+                        ),
+                        isM3u8 = isM3u8,
+                    )
+                )
+            }
+        }
+        return out
+    }
+
+    /**
+     * Okru embed → `videoembed/<id>` page → signed `hlsManifestUrl` in the
+     * page's (double-escaped) JSON config.
+     */
+    private suspend fun resolveOkru(embedSrc: String): String? {
+        val id = Regex("""videoembed/(\d+)""").find(embedSrc)?.groupValues?.get(1) ?: return null
+        val page = HikariNet.getStringSmart("https://ok.ru/videoembed/$id", okruHeaders) ?: return null
+        val key = page.indexOf("hlsManifestUrl")
+        if (key < 0) return null
+        val urlStart = page.indexOf("https://", key)
+        if (urlStart < 0) return null
+        val tail = page.substring(urlStart)
+        val cut = listOf(tail.indexOf("\\&quot;"), tail.indexOf("&quot;"))
+            .filter { it >= 0 }.minOrNull() ?: return null
+        val u = tail.substring(0, cut).trim()
+        if (!u.contains(".m3u8")) return null
+        return unescapeJson(u)
+    }
+
+    /** Un-escapes ok.ru's double-escaped JSON strings (`\\u0026` → `&`, `\/` → `/`). */
+    private fun unescapeJson(s: String): String = s
+        .replace("\\\\", "\\")
+        .replace(Regex("""\\u([0-9a-fA-F]{4})""")) { m ->
+            m.groupValues[1].toInt(16).toChar().toString()
+        }
+        .replace("\\/", "/")
 
     // ------------------------------------------------------------------
     //  Listing parsers
