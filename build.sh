@@ -111,6 +111,21 @@ for dir in */; do
 
   jar cf "$name.hiki" -C build/pkg .
 
+  # desktop .jar = compiled classes + manifest.json (+ bundle + cs3): the same
+  # extension, packaged for the JVM desktop app (it cannot run dex).
+  rm -rf build/desktop-out
+  mkdir -p build/desktop-out
+  cp -r build/ext-out/. build/desktop-out/
+  cp "$name/manifest.json" build/desktop-out/
+  if [ -d "$name/bundle" ]; then
+    cp -r "$name/bundle/." build/desktop-out/
+  fi
+  if [ -d build/pkg/cs3 ]; then
+    cp -r build/pkg/cs3 build/desktop-out/
+  fi
+  jar cf "$name.jar" -C build/desktop-out .
+  echo "built $name.jar"
+
   BUILT="$BUILT $name"
   echo "built $name.hiki"
 done
@@ -150,3 +165,34 @@ generate_repo_json() {
 }
 generate_repo_json > repo.json
 echo "repo.json updated with:$BUILT"
+
+# desktop variant: same plugins, but .jar URLs (the JVM desktop app loads jars)
+generate_repo_desktop_json() {
+  echo "{"
+  echo "  \"name\": \"Hikari Extensions (desktop)\","
+  echo "  \"description\": \"Official .jar extensions for Hikari Desktop.\","
+  echo "  \"plugins\": ["
+  first=1
+  for name in $BUILT; do
+    [ $first -eq 0 ] && echo ","
+    first=0
+    local ver
+    ver=$(sed -n 's/.*"version"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$name/manifest.json" | head -1)
+    ver="${ver:-1}"
+    local tvtypes
+    tvtypes=$(sed -n 's/.*"tvTypes"[^[]*\[\([^]]*\)\].*/\1/p' "$name/manifest.json" | head -1)
+    [ -n "$tvtypes" ] || tvtypes='"movie"'
+    printf '    {\n'
+    printf '      "name": "%s",\n' "$(sed -n 's/.*"name"[^"]*"\([^"]*\)".*/\1/p' "$name/manifest.json" | head -1)"
+    printf '      "description": "%s",\n' "Auto-built Hikari desktop extension from this repo."
+    printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.jar",\n' "$name"
+    printf '      "version": %s,\n' "$ver"
+    printf '      "tvTypes": [%s]\n' "$tvtypes"
+    printf '    }'
+  done
+  echo ""
+  echo "  ]"
+  echo "}"
+}
+generate_repo_desktop_json > repo-desktop.json
+echo "repo-desktop.json updated with:$BUILT"
