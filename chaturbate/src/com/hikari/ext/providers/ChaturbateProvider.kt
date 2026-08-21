@@ -267,11 +267,22 @@ class ChaturbateProvider : HikariProvider {
         return Regex("\"$key\"\\s*:\\s*(-?\\d+)").find(decoded)?.groupValues?.get(1)
     }
 
-    /** The signed LL-HLS playlist URL for the live broadcast. */
+    /** The signed LL-HLS playlist URL for the live broadcast. The dossier
+     *  carries it as a root-relative path with JSON slash-escapes (e.g.
+     *  \/v1\/edge\/streams\/…m3u8?session=…), so unescape it and prepend the
+     *  edge base (the dossier's hls_url when present). */
     private fun extractHlsSource(page: String): String? {
         val decoded = decodeDossierQuotes(page)
-        return Regex(""""hls_source"\s*:\s*"((?:[^"\\]|\\.)*?)"""")
-            .find(decoded)?.groupValues?.get(1)?.let { unescapeUnicode(it) }
+        val raw = Regex(""""hls_source"\s*:\s*"((?:[^"\\]|\\.)*?)"""").find(decoded)?.groupValues?.get(1)
+            ?.let { unescapeUnicode(it) } ?: return null
+        var url = raw.replace("\\/", "/").replace("\\\\", "\\").trim()
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            val base = fieldOf(decoded, "hls_url")?.let { unescapeUnicode(it)?.replace("\\/", "/") }
+                ?.takeIf { it.startsWith("http") }
+                ?: "https://edge-hls.chaturbate.com/edge-hls"
+            url = base.trimEnd('/') + "/" + url.trimStart('/', '\\')
+        }
+        return url
     }
 
     private fun unescapeUnicode(s: String): String =
