@@ -371,6 +371,7 @@ abstract class Cs3BridgeProvider(
             try {
                 result = loadedCs3(ctx, file)
             } catch (t: Throwable) {
+                System.err.println("BRIDGE loadedCs3 threw: " + t)
                 result = emptyList()
             }
         }.apply { isDaemon = true }
@@ -380,7 +381,9 @@ abstract class Cs3BridgeProvider(
         } catch (e: InterruptedException) {
             // ignore
         }
-        return result?.getOrNull(apiIndex)
+        val out = result?.getOrNull(apiIndex)
+        System.err.println("BRIDGE " + name + " loadApi -> result=" + (result?.size ?: -1) + " chosen=" + (out != null))
+        return out
     }
 
     companion object {
@@ -494,6 +497,8 @@ abstract class Cs3BridgeProvider(
                 }
                 apis
             } catch (t: Throwable) {
+                System.err.println("BRIDGE loadCs3 FAILED for " + path + ": " + t);
+                t.printStackTrace(System.err)
                 emptyList()
             }
         }
