@@ -9,6 +9,13 @@ KOTLINC_DIR="${KOTLINC_DIR:-./kotlinc}"
 DEPS="deps"
 mkdir -p "$DEPS"
 
+# Bridge-sourced .cs3 plugins are ALSO published as standalone native CloudStream
+# extensions. The desktop app cannot run the Hikari bridge jar (loads .cs3 fine
+# natively instead), so every bundled .cs3 becomes its own installable .cs3 asset
+# that BOTH the desktop and the Android app load through the native CloudStream path.
+NATIVE_CS3_DIR="native-cs3"
+rm -rf "$NATIVE_CS3_DIR"; mkdir -p "$NATIVE_CS3_DIR"
+
 fetch() {
   local url="$1" file="$2"
   [ -f "$DEPS/$file" ] || curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$DEPS/$file" "$url"
@@ -106,6 +113,7 @@ for dir in */; do
       packaged="${packaged:-$upstream}"
       curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "build/pkg/cs3/$bridge_subdir/$packaged" \
         "https://raw.githubusercontent.com/$bridge_repo/builds/$(urlencode "$upstream")"
+      cp "build/pkg/cs3/$bridge_subdir/$packaged" "$NATIVE_CS3_DIR/${name}-${packaged}"
     done < "$name/bridge-sources.txt"
   fi
 
@@ -159,6 +167,20 @@ generate_repo_json() {
     printf '      "tvTypes": [%s]\n' "$tvtypes"
     printf '    }'
   done
+  for nf in "$NATIVE_CS3_DIR"/*.cs3; do
+    [ -f "$nf" ] || continue
+    [ $first -eq 0 ] && echo ","
+    first=0
+    _b=$(basename "$nf")
+    _p="${_b%.cs3}"
+    printf '    {\n'
+    printf '      "name": "%s",\n' "$_p"
+    printf '      "description": "%s",\n' "Native CloudStream .cs3 extension (auto-built from this repo)."
+    printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s",\n' "$_b"
+    printf '      "version": 1,\n'
+    printf '      "tvTypes": ["movie"]\n'
+    printf '    }'
+  done
   echo ""
   echo "  ]"
   echo "}"
@@ -188,6 +210,20 @@ generate_repo_desktop_json() {
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.jar",\n' "$name"
     printf '      "version": %s,\n' "$ver"
     printf '      "tvTypes": [%s]\n' "$tvtypes"
+    printf '    }'
+  done
+  for nf in "$NATIVE_CS3_DIR"/*.cs3; do
+    [ -f "$nf" ] || continue
+    [ $first -eq 0 ] && echo ","
+    first=0
+    _b=$(basename "$nf")
+    _p="${_b%.cs3}"
+    printf '    {\n'
+    printf '      "name": "%s",\n' "$_p"
+    printf '      "description": "%s",\n' "Native CloudStream .cs3 extension (auto-built from this repo)."
+    printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s",\n' "$_b"
+    printf '      "version": 1,\n'
+    printf '      "tvTypes": ["movie"]\n'
     printf '    }'
   done
   echo ""
