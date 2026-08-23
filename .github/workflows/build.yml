@@ -57,7 +57,7 @@ jobs:
           path: |
             *.hiki
             *.jar
-            *.cs3
+            native-cs3/*.cs3
             repo.json
             repo-desktop.json
           if-no-files-found: error
@@ -68,9 +68,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view continuous --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload continuous *.hiki *.jar *.cs3 repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload continuous *.hiki *.jar native-cs3/*.cs3 repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create continuous *.hiki *.jar *.cs3 repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" \
+            gh release create continuous *.hiki *.jar native-cs3/*.cs3 repo.json repo-desktop.json --repo "$GITHUB_REPOSITORY" \
               --title "Continuous build" \
               --notes "Hikari extensions + repo.json, auto-built from main." || true
           fi
