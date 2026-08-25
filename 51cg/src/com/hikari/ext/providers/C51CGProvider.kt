@@ -39,7 +39,6 @@ class C51CGProvider : HikariProvider {
     override val version = 1
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
-    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
         private const val BASE = "https://51cg1.com"
