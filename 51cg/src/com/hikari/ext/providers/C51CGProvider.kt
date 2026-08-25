@@ -127,20 +127,48 @@ class C51CGProvider : HikariProvider {
         )
     }
 
-    override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
-        val html = getCached(BASE + media.id) ?: return emptyList()
-        val ua = HikariNet.browserHeaders.getValue("User-Agent")
-        val referer = "$BASE/"
+        /** Melon-list (mrdg) posts are TOP10 collection pages: the post page itself
+     *  has no embedded video - it lists the 10 ranked videos as .btn-primary
+     *  buttons. Surface them as episodes so each rank is a tappable video
+     *  (mirrors the CloudStream provider's melon-list handling). */
+    override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? {
+        val page = getCached(BASE + media.id) ?: return null
+        val seg = page.indexOf("post-content")
+        val body = if (seg >= 0) page.substring(seg) else page
+        val out = LinkedHashMap<String, HikariEpisode>()
+        var number = 1
+        val re = Regex("<a[^>]+href=\"(/archives/\\d+/)\"[^>]*class=\"[^>]*btn[^>]*\"[^>]*>([\\s\\S]*?)</a>")
+        for (m in re.findAll(body)) {
+            val href = m.groupValues[1]
+            if (out.containsKey(href)) continue
+            var raw = stripTags(m.groupValues[2]).trim()
+            raw = raw.substringBefore("点击查看详情").trim().trimEnd('→', '｜').trim()
+            out[href] = HikariEpisode(
+                number = number,
+                id = href,
+                name = translate(raw) ?: raw,
+            )
+            number++
+        }
+        return if (out.isEmpty()) null else out.values.toList()
+    }
 
-        val urls = LinkedHashSet<String>()
-        // data-config JSON uses escaped slashes: https:\/\/hls...\/...m3u8
-        val escaped = Regex("https?:\\\\?/\\\\?/[^\\s\"'<>]+?\\.m3u8[^\\s\"'<>]*")
-        escaped.findAll(html).forEach { urls.add(it.value.replace("\\/", "/").replace("&amp;", "&")) }
-        if (urls.isEmpty()) {
-            val plain = Regex("https?://[^\\s\"'<>]+\\.m3u8[^\\s\"'<>]*")
-            plain.findAll(html).forEach { urls.add(it.value) }
+    override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
+        var html = getCached(BASE + media.id) ?: return emptyList()
+        var urls = extractM3u8(html)
+        if (urls.isEmpty() && episode != null && episode.id.startsWith("/")) {
+            html = getCached(BASE + episode.id) ?: return emptyList()
+            urls = extractM3u8(html)
+        }
+        if (urls.isEmpty() && episode == null) {
+            getEpisodes(media)?.firstOrNull()?.let { first ->
+                getCached(BASE + first.id)?.let { urls = extractM3u8(it) }
+            }
         }
         if (urls.isEmpty()) return emptyList()
+
+        val ua = HikariNet.browserHeaders.getValue("User-Agent")
+        val referer = "$BASE/"
 
         val headers = mapOf("Referer" to referer, "User-Agent" to ua)
         return urls.mapIndexed { i, u ->
@@ -151,6 +179,19 @@ class C51CGProvider : HikariProvider {
                 isM3u8 = true,
             )
         }
+    }
+
+    /** Extracts every HLS stream URL from a post page (escaped-slash configs
+     *  first, then plain URLs). */
+    private fun extractM3u8(html: String): List<String> {
+        val urls = LinkedHashSet<String>()
+        val escaped = Regex("https?:\\\\?/\\\\?/[^\\s\"'<>]+?\\.m3u8[^\\s\"'<>]*")
+        escaped.findAll(html).forEach { urls.add(it.value.replace("\\/", "/").replace("&amp;", "&")) }
+        if (urls.isEmpty()) {
+            val plain = Regex("https?://[^\\s\"'<>]+\\.m3u8[^\\s\"'<>]*")
+            plain.findAll(html).forEach { urls.add(it.value) }
+        }
+        return urls.toList()
     }
 
     // ---- HTML helpers ----
