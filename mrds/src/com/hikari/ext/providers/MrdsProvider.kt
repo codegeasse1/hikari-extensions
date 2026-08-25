@@ -158,7 +158,7 @@ class MrdsProvider : HikariProvider {
     }
 
     /** Extracts the video-card grid from a list/search page. Skips ad articles. */
-    private fun parseCards(html: String): List<HikariMedia> {
+    private suspend fun parseCards(html: String): List<HikariMedia> {
         val out = LinkedHashMap<String, HikariMedia>()
         val articleRe = Regex("<article(?![^>]*ad-item)[^>]*>([\\s\\S]*?)</article>")
         for (m in articleRe.findAll(html)) {
@@ -185,7 +185,7 @@ class MrdsProvider : HikariProvider {
     }
 
     /** Decrypts the AES-encrypted poster bytes served by pic.xustgq.cn. */
-    private fun decryptImage(url: String): String? = try {
+    private suspend fun decryptImage(url: String): String? = try {
         val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$BASE/")) ?: return null
         val key = SecretKeySpec(IMG_KEY.toByteArray(), "AES")
         val iv = IvParameterSpec(IMG_IV.toByteArray())
