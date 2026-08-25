@@ -156,20 +156,19 @@ class C51CGProvider : HikariProvider {
         var html = getCached(BASE + media.id) ?: return emptyList()
         var urls = extractM3u8(html)
         if (urls.isEmpty() && episode != null && episode.id.startsWith("/")) {
-            html = getCached(BASE + episode.id) ?: return emptyList()
+            html = getCached(BASE + episode.id, refresh = true) ?: return emptyList()
             urls = extractM3u8(html)
         }
         if (urls.isEmpty() && episode == null) {
             getEpisodes(media)?.firstOrNull()?.let { first ->
-                getCached(BASE + first.id)?.let { urls = extractM3u8(it) }
+                getCached(BASE + first.id, refresh = true)?.let { urls = extractM3u8(it) }
             }
         }
         if (urls.isEmpty()) return emptyList()
 
-        val ua = HikariNet.browserHeaders.getValue("User-Agent")
         val referer = "$BASE/"
 
-        val headers = mapOf("Referer" to referer, "User-Agent" to ua)
+        val headers = mapOf("Referer" to referer)
         return urls.mapIndexed { i, u ->
             HikariStream(
                 name = if (urls.size == 1) "51CG" else "Video ${i + 1}",
@@ -195,16 +194,23 @@ class C51CGProvider : HikariProvider {
 
     // ---- HTML helpers ----
 
-    /** Fetches a page once per CACHE_TTL_MS (home builds many rows). */
-    private suspend fun getCached(url: String): String? {
-        val now = System.currentTimeMillis()
-        cacheMutex.withLock {
-            htmlCache[url]?.let { (t, html) -> if (now - t < CACHE_TTL_MS) return html }
+    /** Fetches a page once per CACHE_TTL_MS (home builds many rows). Uses plain
+     *  [HikariNet.getString] — never the WebView renderer: 51CG is plain
+     *  server-rendered HTML so the browser fallback can never help, and a
+     *  main-thread WebView could freeze the app into a black screen. Pass
+     *  refresh=true to bypass the cache and grab a freshly signed stream URL
+     *  (the embedded auth_key expires, and a stale one means a dead stream). */
+    private suspend fun getCached(url: String, refresh: Boolean = false): String? {
+        if (!refresh) {
+            val now = System.currentTimeMillis()
+            cacheMutex.withLock {
+                htmlCache[url]?.let { (t, html) -> if (now - t < CACHE_TTL_MS) return html }
+            }
         }
-        val html = HikariNet.getStringSmart(url) ?: return null
+        val html = HikariNet.getString(url) ?: return null
         cacheMutex.withLock {
             if (htmlCache.size > 60) htmlCache.clear()
-            htmlCache[url] = now to html
+            htmlCache[url] = System.currentTimeMillis() to html
         }
         return html
     }
