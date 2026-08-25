@@ -44,6 +44,7 @@ Or download `chaturbate.hiki` and use **Pick .hiki file**.
 | `fkbae.hiki` | User-uploaded nude videos from Snapchat, Telegram, Instagram & Discord (fkbae.to) — 20 category walls plus search, direct HLS streams. |
 | `justanime.hiki` | Anime from justanime.to — Trending, Popular, Airing, Upcoming and more rows, full episode lists with sub & dub, HLS via the site's own proxy. |
 | `iwara.hiki` | MMD, 3DCG, HMV and Blender anime videos from iwara.tv — Latest, Trending, Popular, Most Liked and 8 tag rows (MMD, 3DCG, Koikatsu, Honey Select, …), direct MP4 quality streams via the site's own signed manifest API. Search falls back to tag matching (iwara's text search needs a login). |
+| `mrds.hiki` | Daily contest & gossip videos from mrds.com — 21 category walls plus search and direct signed HLS streams (unlimited pagination). |
 | `missav.hiki` | Free JAV from missav.ws — 100k+ videos across 12 home rows (new releases, hot today, uncensored leak, big breasts, mature woman, creampie, wife, …), genre browsing and search, LL-HLS in the built-in player. |
 | `oppai.hiki` | Hentai anime from oppai.stream in HD/4K — 16 home rows (orders + genres), direct MP4 plus DASH 720/1080/4k streams, no WebView needed. |
 | `hanime1.hiki` | The full hanime1.me feed — 12 home rows (new releases, recent uploads, 裏番, 泡麵番, Motion, 3DCG, 2.5D, 2D, AI, MMD, Cosplay, popular). Streams are captured in a real WebView (Cloudflare). |
