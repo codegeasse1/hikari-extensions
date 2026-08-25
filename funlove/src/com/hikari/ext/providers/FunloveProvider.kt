@@ -14,7 +14,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 
 /**
- * FunLove (funlove.info) — exclusive FC2PPV / JAV / China AV streaming site.
+ * FunLove (funlove.info) â exclusive FC2PPV / JAV / China AV streaming site.
  * The UI is a React SPA on funlove.info backed by a JSON API on funlove.pro.
  *
  *  - Catalogs/search hit the open endpoints: `/api/product` (home sections),
@@ -32,8 +32,8 @@ class FunloveProvider : HikariProvider {
     override val id = "funlove"
     override val name = "FunLove"
     override val mainUrl = "https://funlove.info"
-    override val description = "Exclusive FC2PPV / JAV from funlove.info — new, popular and top-viewed rows, movies archive and search."
-    override val version = 4
+    override val description = "Exclusive FC2PPV / JAV from funlove.info â new, popular and top-viewed rows, movies archive and search."
+    override val version = 5
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -133,7 +133,7 @@ class FunloveProvider : HikariProvider {
         val seen = HashSet<String>()
 
         // 1) The site's own player API (browser headers, device IP). The API
-        //    returns several named servers (`sources[]` — e.g. different CDN
+        //    returns several named servers (`sources[]` â e.g. different CDN
         //    hosts for the same movie); every one is exposed so the player can
         //    auto-switch if one server rejects seeking.
         val body = HikariNet.getString("$API/iframe-video/$slug", apiHeaders)
@@ -156,7 +156,7 @@ class FunloveProvider : HikariProvider {
         }
 
         // 2) Also run the site's own watch page in a WebView and capture the
-        //    video request it makes — an alternative server if the API URL's
+        //    video request it makes â an alternative server if the API URL's
         //    CDN is picky about seeking.
         try {
             val hits = HikariNet.resolveWithWebView(watchPage, streamCapture, timeoutMs = 45_000)
@@ -172,7 +172,7 @@ class FunloveProvider : HikariProvider {
                 )
             }
         } catch (t: Throwable) {
-            // ignore — the API streams (if any) are still usable
+            // ignore â the API streams (if any) are still usable
         }
         return out
     }
@@ -181,6 +181,30 @@ class FunloveProvider : HikariProvider {
      *  a `.m3u8` in the URL path, which the progressive player would choke on). */
     private fun looksLikeHls(u: String): Boolean =
         u.contains(".m3u8", ignoreCase = true) || u.contains("m3u8", ignoreCase = true)
+
+    /** True when a URL is clearly an ad or an image (gif ads are served by the
+     *  player API alongside real streams). Such URLs must never be exposed as video,
+     *  otherwise the player "plays" the ad GIF instead of the movie. */
+    private fun isAdOrImage(u: String): Boolean {
+        val lower = u.lowercase()
+        if (lower.contains(".gif")) return true
+        val host = lower.substringAfter("://").substringBefore("/")
+        for (h in adHosts) if (host.endsWith(h) || host == h) return true
+        val path = lower.substringAfter("://").substringAfter("/").substringBefore("?").substringBefore("#")
+        val last = path.substringAfterLast("/")
+        return imageExtensions.any { last.contains(it) }
+    }
+
+    private val adHosts = listOf(
+        "doubleclick.net", "googlesyndication.com", "googletagservices.com",
+        "adservice.google.com", "adnxs.com", "taboola.com", "outbrain.com",
+        "endlesshandbaglinked.com", "popads.net", "propellerads.com",
+        "adsterra.com", "exoclick.com", "juicyads.com",
+    )
+
+    private val imageExtensions = listOf(
+        ".gif", ".jpg", ".jpeg", ".png", ".webp", ".avif", ".svg", ".bmp",
+    )
 
     // ------------------------------------------------------------------
     //  Parsing helpers
@@ -212,7 +236,7 @@ class FunloveProvider : HikariProvider {
 
     /**
      * Pulls the playable server list out of the iframe-video response body.
-     * The API returns `data.sources[]` — an array of `{name, file}` server
+     * The API returns `data.sources[]` â an array of `{name, file}` server
      * objects (different CDN hosts for the same movie) plus a default `file`.
      * Returns (serverName, url) pairs, m3u8 first so the player prefers a
      * seek-friendly HLS server when the site offers one.
@@ -222,6 +246,7 @@ class FunloveProvider : HikariProvider {
         fun add(name: String, raw: Any?) {
             val t = raw.toString().trim()
             if (t.isBlank() || t.length >= 500 || t.contains("<")) return
+            if (isAdOrImage(t)) return
             val u = if (t.startsWith("//")) "https:$t" else t
             if (u.startsWith("http")) found.putIfAbsent(u, name)
         }
@@ -231,7 +256,7 @@ class FunloveProvider : HikariProvider {
         val json = runCatching { JSONObject(body) }.getOrNull()
         if (json != null) {
             val root = json.optJSONObject("data") ?: json
-            // Named servers first — these are the site's own server buttons.
+            // Named servers first â these are the site's own server buttons.
             val sources = root.optJSONArray("sources")
             if (sources != null) {
                 for (i in 0 until sources.length()) {
