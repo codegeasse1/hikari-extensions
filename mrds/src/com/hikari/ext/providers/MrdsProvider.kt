@@ -78,8 +78,10 @@ class MrdsProvider : HikariProvider {
     )
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
-        val base = if (catalog.id == "home") "$BASE/" else "$BASE/category/${catalog.id}/"
-        val url = if (page <= 1) base else "${base}page/$page/"
+        val url = when {
+            catalog.id == "home" -> if (page <= 1) "$BASE/" else "$BASE/page/$page/"
+            else -> if (page <= 1) "$BASE/category/${catalog.id}/" else "$BASE/category/${catalog.id}/$page/"
+        }
         val html = getCached(url) ?: return emptyList()
         return parseCards(html)
     }
