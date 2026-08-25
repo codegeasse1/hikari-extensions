@@ -33,7 +33,7 @@ class FunloveProvider : HikariProvider {
     override val name = "FunLove"
     override val mainUrl = "https://funlove.info"
     override val description = "Exclusive FC2PPV / JAV from funlove.info â new, popular and top-viewed rows, movies archive and search."
-    override val version = 5
+    override val version = 6
     override val tvTypes: Set<HikariMediaType> = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -51,7 +51,9 @@ class FunloveProvider : HikariProvider {
             "Origin" to SITE,
         )
 
-        private val streamCapture = Regex("""https?://[^"'\s]+?\.(?:m3u8|mp4)(?:[?#][^"'\s]*)?""")
+        private val streamCapture = Regex(
+            """https?://[^"'\s]+?\.(?:m3u8|mp4)(?:[?#][^"'\s]*)?|https?://[^"'\s]*funlove\.b-cdn\.net/[^"'\s]*"""
+        )
 
         // Field names the iframe-video player JSON has been seen using.
         private val urlKeys = listOf(
@@ -161,7 +163,7 @@ class FunloveProvider : HikariProvider {
         try {
             val hits = HikariNet.resolveWithWebView(watchPage, streamCapture, timeoutMs = 45_000)
             for (h in hits) {
-                if (h.url.isBlank() || !seen.add(h.url)) continue
+                if (h.url.isBlank() || isAdOrImage(h.url) || !seen.add(h.url)) continue
                 out.add(
                     HikariStream(
                         name = "Server ${out.size + 1}",
@@ -300,6 +302,15 @@ class FunloveProvider : HikariProvider {
         for (m in Regex("""https?://[^"'\s>]+?\.m3u8[^"'\s>]*""").findAll(body)) {
             val u = m.value.trim().trimEnd('\\', '"', '\'')
             if (u.isBlank() || !looksLikeHls(u)) continue
+            add("Server ${found.size + 1}", u)
+        }
+
+        // Also sweep for the site's own media host (funlove.b-cdn.net): the API
+        // serves the actual file from there (no extension in the path), and the
+        // structured walk above can miss it when it is nested in arrays/strings.
+        for (m in Regex("""https?://[^"'\s>]*funlove\.b-cdn\.net/[^"'\s>]*""").findAll(body)) {
+            val u = m.value.trim().trimEnd('\\', '"', '\'')
+            if (u.isBlank() || isAdOrImage(u)) continue
             add("Server ${found.size + 1}", u)
         }
 
