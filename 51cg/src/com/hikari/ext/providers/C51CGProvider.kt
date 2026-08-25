@@ -24,7 +24,7 @@ import javax.crypto.spec.SecretKeySpec
  *  - categories:     `https://51cg1.com/category/<slug>/` → `.../<n>/`
  *  - search:         `https://51cg1.com/search/<q>/` → `.../<n>/`
  *  - a post page (`/archives/<id>/`) embeds a DPlayer whose `data-config`
- *    JSON holds the signed `hls.*/...m3u8` stream.
+ *    JSON holds the signed HLS m3u8 stream.
  *  - post images live on `pic.xustgq.cn` AES-encrypted and must be decrypted.
  *
  * getCatalog/search take a page argument, so the app's own pagination is
