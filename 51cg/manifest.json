@@ -1,0 +1,5 @@
+{
+  "name": "51CG",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.C51CGProvider"
+}

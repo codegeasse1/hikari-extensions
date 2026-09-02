@@ -1,0 +1,146 @@
+package com.hikari.ext
+
+import com.lagradost.cloudstream3.network.WebViewResolver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import org.json.JSONObject
+
+/** A request the page fired that matched the capture regex. */
+data class HikariWebViewResult(
+    val url: String,
+    val headers: Map<String, String> = emptyMap(),
+)
+
+/** Full HTTP response summary (for callers that must inspect errors). */
+data class HikariResponse(
+    val status: Int,
+    val url: String,
+    val body: String? = null,
+)
+
+/**
+ * The helper library Hikari extensions are written against. All helpers are
+ * plain functions over the app's hardened networking stack (redirects,
+ * generous timeouts, browser User-Agent, CloudStream's Conscrypt TLS setup),
+ * so extensions never have to fight CDNs by themselves.
+ */
+object HikariNet {
+
+    /** Browser-like headers for scraping (desktop Chrome fingerprint). */
+    val browserHeaders: Map<String, String> = mapOf(
+        "User-Agent" to com.hikari.app.net.Http.UA,
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language" to "en-US,en;q=0.9",
+    )
+
+    /** GET and return the response body as text (null on any failure). */
+    suspend fun getString(url: String, headers: Map<String, String> = emptyMap()): String? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getString(url, headers)
+        }
+
+    /** STUB — see [getString]. The real POST helpers live in the app's
+     *  com.hikari.ext.HikariNet (parent-first classloading), so extensions can
+     *  call them freely; this body only lets the repo compile. */
+    suspend fun postString(
+        url: String,
+        body: String,
+        headers: Map<String, String> = emptyMap(),
+        contentType: String = "application/json; charset=utf-8",
+    ): String? = withContext(Dispatchers.IO) {
+        com.hikari.app.net.Http.postString(url, body, headers, contentType)
+    }
+
+    suspend fun postJson(
+        url: String,
+        body: JSONObject,
+        headers: Map<String, String> = emptyMap(),
+    ): JSONObject? = withContext(Dispatchers.IO) {
+        postString(url, body.toString(), headers + mapOf("Content-Type" to "application/json; charset=utf-8"))
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+    }
+
+    fun base64Decode(s: String): ByteArray? = runCatching {
+        java.util.Base64.getDecoder().decode(s)
+    }.getOrNull()
+
+    fun base64Encode(bytes: ByteArray): String =
+        java.util.Base64.getEncoder().encodeToString(bytes)
+
+    /**
+     * GET like [getString], but when the plain HTTP client gets blocked (a
+     * WAF challenge page or hard failure) it re-fetches the page inside a real
+     * WebView and returns the rendered HTML. This is the helper catalog/search/
+     * video pages should use — okhttp alone is Cloudflare-blocked on several
+     * sites that serve real browsers fine. STUB: the real implementation lives
+     * in the app's com.hikari.ext.HikariNet (parent-first classloading), so
+     * this body only exists to let the extension repo compile.
+     */
+    suspend fun getStringSmart(url: String, headers: Map<String, String> = emptyMap()): String? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getStringSmart(url, headers)
+        }
+
+    /** STUB — see [getStringSmart]. */
+    suspend fun getStringRendered(url: String, timeoutMs: Long = 25_000): String? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getStringRendered(url, timeoutMs)
+        }
+
+    /** GET and parse the response as JSON (null on failure). */
+    suspend fun getJson(url: String, headers: Map<String, String> = emptyMap()): JSONObject? =
+        withContext(Dispatchers.IO) {
+            getString(url, headers)?.let { runCatching { JSONObject(it) }.getOrNull() }
+        }
+
+    suspend fun getBytes(url: String, headers: Map<String, String> = emptyMap()): ByteArray? =
+        withContext(Dispatchers.IO) {
+            com.hikari.app.net.Http.getBytes(url, headers)
+        }
+
+    /** Full response (status + body) for callers that must see error codes. */
+    suspend fun fetch(url: String, headers: Map<String, String> = emptyMap()): HikariResponse? =
+        withContext(Dispatchers.IO) {
+            try {
+                com.hikari.app.net.Http.get(url, headers).use { r ->
+                    HikariResponse(r.code, r.request.url.toString(), r.body?.string())
+                }
+            } catch (t: Throwable) {
+                null
+            }
+        }
+
+    /**
+     * Runs [url] in a real Android WebView (on the main thread, exactly like
+     * the CloudStream runtime does) and returns every request the page fired
+     * whose URL matches [capture] (or [additional]). This is the helper that
+     * makes StreamHG/hgcloud-style embeds work: the player page's own JS runs
+     * in a browser, and the m3u8 (or master.txt) it requests comes back as a
+     * [HikariWebViewResult] (URL + headers), ready to hand to the player.
+     */
+    suspend fun resolveWithWebView(
+        url: String,
+        capture: Regex,
+        additional: List<Regex> = emptyList(),
+        timeoutMs: Long = 60_000,
+        script: String? = null,
+    ): List<HikariWebViewResult> = withContext(Dispatchers.IO) {
+        val resolver = WebViewResolver(
+            interceptUrl = capture,
+            additionalUrls = additional,
+            timeout = timeoutMs,
+            script = script,
+        )
+        runCatching {
+            val (fixed, extra) = resolver.resolveUsingWebView(url)
+            buildList {
+                fixed?.let { add(it.toResult()) }
+                extra.forEach { add(it.toResult()) }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun Request.toResult() =
+        HikariWebViewResult(url.toString(), headers.toMap().filterValues { it.isNotBlank() })
+}
