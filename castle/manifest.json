@@ -1,0 +1,6 @@
+{
+  "name": "Castle TV",
+  "version": 3,
+  "tvTypes": ["movie", "tv"],
+  "mainClass": "com.hikari.ext.providers.CastleProvider"
+}

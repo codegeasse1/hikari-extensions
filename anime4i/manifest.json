@@ -1,0 +1,6 @@
+{
+  "name": "Anime4i",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.Anime4iProvider",
+  "tvTypes": ["series", "movie"]
+}
