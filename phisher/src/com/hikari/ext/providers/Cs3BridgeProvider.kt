@@ -215,8 +215,54 @@ abstract class Cs3BridgeProvider(
 
     private fun pageRefId(pageIndex: Int): String = "page:$pageIndex"
 
-    private fun indexAfter(id: String, prefix: String): Int? =
-        id.removePrefix(prefix).substringBefore(':').takeIf { id.startsWith(prefix) }?.toIntOrNull()
+    /**
+     * The HomePageList a Home tile stands for, BY NAME first.
+     *
+     * The stored index only breaks ties, because these plugins re-fetch their
+     * whole home page on every call (CNC Verse's getMainPage ignores the request
+     * it is given and always re-reads /mobile/home) and a mirror's tray list is
+     * not stable between reads. Slicing a later read by an earlier read's index
+     * is what put a different tray's (often empty) contents under a row's name.
+     * Rows that share a name — three trays literally called "Recently added" are
+     * not hypothetical — are disambiguated by picking the one nearest the
+     * recorded position.
+     */
+    private fun rowFor(rows: List<HomePageList>, name: String, index: Int): HomePageList? {
+        val wanted = name.trim()
+        if (wanted.isNotEmpty()) {
+            val matches = rows.withIndex().filter { it.value.name.trim() == wanted }
+            if (matches.isNotEmpty()) {
+                return matches.minByOrNull { kotlin.math.abs(it.index - index) }?.value
+            }
+        }
+        return rows.getOrNull(index)
+    }
+
+    /**
+     * The page index encoded in a catalog id — `row:<page>:<row>` or
+     * `page:<page>`.
+     *
+     * These are parsed SEPARATELY from the row index on purpose: the older
+     * single-index helper read the FIRST number of a `row:<page>:<row>` id, so
+     * the row index it produced was really the page index. Every Home row was
+     * then matched against row 0 of its page (or, when names were missing, the
+     * wrong tray outright), which is exactly the "this extension loads in
+     * CloudStream but shows nothing in Hikari" report.
+     */
+    private fun pageIndexOf(id: String): Int? = when {
+        id.startsWith("row:") -> id.removePrefix("row:").substringBefore(':').toIntOrNull()
+        id.startsWith("page:") -> id.removePrefix("page:").toIntOrNull()
+        else -> null
+    }
+
+    /** The ROW index encoded in a `row:<page>:<row>` catalog id (null for any
+     *  other shape, including a whole-page catalog). */
+    private fun rowIndexOf(id: String): Int? =
+        if (id.startsWith("row:")) {
+            id.removePrefix("row:").substringAfter(':', "").toIntOrNull()
+        } else {
+            null
+        }
 
     // `HikariProvider.catalogs()` is a PLAIN (blocking) function — the app
     // declares it non-suspend, so the class the extension is dexed from has to
@@ -317,7 +363,10 @@ abstract class Cs3BridgeProvider(
             val a = requireApi()
             val rows: List<HomePageList>
             val wanted: Int
-            val pageIndex = indexAfter(catalog.id, "row:") ?: indexAfter(catalog.id, "page:")
+            // The home page this catalog stands for, kept so an EMPTY row can
+            // re-read it once (see below).
+            var retryPage: MainPageData? = null
+            val pageIndex = pageIndexOf(catalog.id)
             if (pageIndex != null) {
                 val mainPage = try {
                     a.mainPage.getOrNull(pageIndex)
@@ -332,10 +381,13 @@ abstract class Cs3BridgeProvider(
                     throw failed("its home page threw ${describe(t)}")
                 }
                 rows = fetched
-                wanted = indexAfter(catalog.id, "row:") ?: -1
-                if (rows.isEmpty() && wanted >= 0) {
-                    throw failed("\"${catalog.name}\" came back empty")
-                }
+                retryPage = mainPage
+                wanted = rowIndexOf(catalog.id) ?: -1
+                // An EMPTY read is not a verdict here: a plugin that re-reads
+                // its whole home page per call can answer nothing on one read
+                // (a cold session, a mirror hiccup) and everything on the next.
+                // The re-read below is what decides; this branch deliberately
+                // does not throw early.
             } else {
                 // Back-compat: an older Hikari sent the page's own data as the
                 // catalog id. The first home page is what that meant.
@@ -354,13 +406,36 @@ abstract class Cs3BridgeProvider(
                 wanted = -1
             }
             val items = if (wanted >= 0) {
-                val row = rows.getOrNull(wanted) ?: rows.firstOrNull()
-                row?.list.orEmpty().mapNotNull { it.toMedia() }
+                var row = rowFor(rows, catalog.name, wanted)
+                var mapped = row?.list.orEmpty().mapNotNull { it.toMedia() }
+                if (mapped.isEmpty()) {
+                    // Empty (or gone) on the page we were handed. Both are
+                    // usually the same thing: these plugins re-read their whole
+                    // home page on every call and a mirror's tray list is not
+                    // stable between reads, so a row sliced out of a LATER read
+                    // by an index taken from an earlier one can land on an empty
+                    // (or different) tray. Re-read once and match again before
+                    // reporting an empty row.
+                    val again = retryPage?.let { pg ->
+                        try {
+                            fetchRows(a, pg.name, pg.data, page)
+                        } catch (t: Throwable) {
+                            if (t is CancellationException) throw t
+                            rows
+                        }
+                    } ?: rows
+                    row = rowFor(again, catalog.name, wanted)
+                    mapped = row?.list.orEmpty().mapNotNull { it.toMedia() }
+                }
+                mapped
             } else {
                 rows.flatMap { row -> row.list.orEmpty().mapNotNull { it.toMedia() } }
             }
             if (items.isEmpty()) {
-                throw failed(if (wanted >= 0) "\"${catalog.name}\" is empty" else "its home page is empty")
+                throw failed(
+                    if (wanted >= 0) "\"${catalog.name}\" came back empty — refresh Home"
+                    else "its home page came back empty — refresh Home"
+                )
             }
             lastFailure = null
             items
@@ -916,7 +991,19 @@ abstract class Cs3BridgeProvider(
     // ------------------------------------------------------------------- mapping
 
     private fun SearchResponse.toMedia(): HikariMedia? {
-        if (url.isBlank() || name.isBlank()) return null
+        // Only the URL is required: an item without one cannot be opened, but a
+        // blank NAME is how plenty of CloudStream plugins deliberately post a
+        // poster-only card — CNC Verse's NetflixMirrorProvider builds its whole
+        // home page with
+        //
+        //     newAnimeSearchResponse("", Id(id).toJson()) { posterUrl = … }
+        //
+        // (its search() passes a real name, which is why search worked while the
+        // catalogue did not). CloudStream renders those cards; dropping them here
+        // emptied every row of such an extension — "\"<row>\" is empty" for a
+        // plugin that lists perfectly in CloudStream. The real title comes from
+        // the plugin's load() when the item is opened.
+        if (url.isBlank()) return null
         val mt = when (type) {
             TvType.Movie, TvType.AnimeMovie, TvType.NSFW -> HikariMediaType.MOVIE
             TvType.TvSeries, TvType.Anime, TvType.Cartoon, TvType.OVA, TvType.AsianDrama -> HikariMediaType.SERIES
