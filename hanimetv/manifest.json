@@ -1,0 +1,5 @@
+{
+  "name": "HanimeTV",
+  "version": 9,
+  "mainClass": "com.hikari.ext.providers.HanimetvProvider"
+}

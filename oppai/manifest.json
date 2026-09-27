@@ -1,0 +1,5 @@
+{
+  "name": "Oppai Stream",
+  "version": 3,
+  "mainClass": "com.hikari.ext.providers.OppaiProvider"
+}

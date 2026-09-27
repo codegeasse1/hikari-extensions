@@ -1,0 +1,1142 @@
+{
+  "name": "Hikari Extensions",
+  "description": "Official .hiki extensions for Hikari.",
+  "plugins": [
+    {
+      "name": "51CG",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/51cg.hiki",
+      "version": 2,
+      "fileHash": "sha256-99e2c53fa9724eedc345122eee47fe437c04ed48d0970e71f633e900931027cd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Anime",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime.hiki",
+      "version": 3,
+      "fileHash": "sha256-e87461023c7b49bc0d9041ab781b25ed765cf05be0a9c850ca50fa015a7e94f3",
+      "tvTypes": ["movie","tv"]
+    },
+    {
+      "name": "Anime4i",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime4i.hiki",
+      "version": 2,
+      "fileHash": "sha256-65b8f8e42f71d8f058e8c19fd053fb011f79e17ff21d88ebe81841eb18fc31e7",
+      "tvTypes": ["series", "movie"]
+    },
+    {
+      "name": "Castle TV",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/castle.hiki",
+      "version": 3,
+      "fileHash": "sha256-24fe4ae2a6c05abea8a4f3522bf12a762d9e4801a56938375bec4b67fd9be6e0",
+      "tvTypes": ["movie", "tv"]
+    },
+    {
+      "name": "Chaturbate (Hikari)",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/chaturbate.hiki",
+      "version": 4,
+      "fileHash": "sha256-f87c94e1ac0ba7ab7c85d3bb6c99493febb83b5c4ffbc2b421b14853a256bc5f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "CNC Verse",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse.hiki",
+      "version": 4,
+      "fileHash": "sha256-590d60a5aa391aae80980b7b12cc33b39714ff44b99e083fdaa98def7cae13b1",
+      "tvTypes": ["movie","tv"]
+    },
+    {
+      "name": "FkBAE",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/fkbae.hiki",
+      "version": 4,
+      "fileHash": "sha256-62e3d7ce0240890526750ff53b169a1d4e3921da6ada4fc92cf1459e97b74646",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "FunLove",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/funlove.hiki",
+      "version": 6,
+      "fileHash": "sha256-525dbe93844221151aed2650bd086dde3880c0aa08906d677fbfcaa22c062847",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Hanime1",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanime1.hiki",
+      "version": 5,
+      "fileHash": "sha256-d8bfb6b8f21f3933c24e0c7434b146f889812104cae29051cd5647ce87f4fcf8",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "HanimeTV",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hanimetv.hiki",
+      "version": 9,
+      "fileHash": "sha256-9723695d7bd6ca964fc46de39efcba2ea58a2555c008d5a65d2c5419a674e777",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "HStream",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/hstream.hiki",
+      "version": 3,
+      "fileHash": "sha256-480bba4bc20d7901759554ca0feefdc39e8c1f565e8f2b4a5b51f15c4d825f5c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Iwara",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/iwara.hiki",
+      "version": 1,
+      "fileHash": "sha256-a203e19c60cf5718e4c3bda4549f3be076f3c50b7548e2f0466f9384d8da8ca2",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "JavOpen",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/javopen.hiki",
+      "version": 2,
+      "fileHash": "sha256-81d3ecd824452fbe40f29ab2cc8fc3df0cb2c595cd51bc400cce7ecb466de951",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "JustAnime",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/justanime.hiki",
+      "version": 3,
+      "fileHash": "sha256-4b11ff8f48ac1a522e784b4d8a1d89906b035071c02e1468849cdb9e3bd26b9f",
+      "tvTypes": ["series", "movie"]
+    },
+    {
+      "name": "Krx18",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/krx18.hiki",
+      "version": 4,
+      "fileHash": "sha256-c97bc82d691d98ed482bba176d30774f1e5ab61ffce36129635cbaa88da16772",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "LeakPorner",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/leakporner.hiki",
+      "version": 3,
+      "fileHash": "sha256-8140e0bf73a515cee71b8b63c2aba3e4ba6e7a52b4af550d1c352b720b377f85",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "MissAV (JAV)",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/missav.hiki",
+      "version": 4,
+      "fileHash": "sha256-04c166c165291337d923a44db19b4b64e7c5e37aac93f33f0668b2526893a3a2",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "MRDS",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/mrds.hiki",
+      "version": 2,
+      "fileHash": "sha256-c51a2dd6dec0187c6f5d94e4974e20160381e9f2e2d5dcae798fdbb8a25bde55",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Oppai Stream",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/oppai.hiki",
+      "version": 3,
+      "fileHash": "sha256-27728f15404b465a205234e1c8d2f4976b385e0e8b519200074142aaea8f03be",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Phisher",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher.hiki",
+      "version": 4,
+      "fileHash": "sha256-b2037b6a52144a51dc4d64ebd21820f18b087ad16fe364c3a2f9eec6fa331bce",
+      "tvTypes": ["movie","tv"]
+    },
+    {
+      "name": "PimpBunny",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/pimpbunny.hiki",
+      "version": 1,
+      "fileHash": "sha256-e100f0586b371b223f7c456230eabdd8468b7e6988c004bfd57fec71ef14913a",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Porn4Fans",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/porn4fans.hiki",
+      "version": 2,
+      "fileHash": "sha256-c65cbf97743cefc1881902954f3b7c97c07d68928b9179db9eddc8906d813da0",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "PornBimbo",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/pornbimbo.hiki",
+      "version": 2,
+      "fileHash": "sha256-e410320eaf1c6d04b54167dd38a05ec2381d92d78795b99e38652f41fb0895ee",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "PornHoarder",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/pornhoarder.hiki",
+      "version": 3,
+      "fileHash": "sha256-2a8f52918ba7cd3dc18376e42ea2491110e2b2d45aac5b3264d3fbea39fc8c38",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "Tubes",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/tubes.hiki",
+      "version": 3,
+      "fileHash": "sha256-16f10fb744a68babb8cc4bfa544a277ec590c2845e8c56a9a09569c038166b60",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "WatchHentai",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/watchhentai.hiki",
+      "version": 5,
+      "fileHash": "sha256-8303d558d14525c4f5822bfd95fda1f755cd5b06cea0a2a3d66e44f3facbcd5c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "XFree",
+      "description": "Auto-built Hikari extension from this repo.",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/xfree.hiki",
+      "version": 1,
+      "fileHash": "sha256-4a206c0ddae70ea53f6bac22488b49279d28e10683fb1ca576c127b56f217f8f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "anime-AniKoto",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime-AniKoto.cs3",
+      "version": 1,
+      "fileHash": "sha256-3617b3b40397e6124739748f3d8b27bacbb0ca94b7cc26ca6f06b77d3c93a265",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "anime-Anikage",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime-Anikage.cs3",
+      "version": 1,
+      "fileHash": "sha256-dbff9aa3d805b570e03157dd5293ec1617cd4a1443e8f858d0d5e3ac40044901",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "anime-Animekhor",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime-Animekhor.cs3",
+      "version": 1,
+      "fileHash": "sha256-416016cfbf4f4e2e9704037d19de089234c6fd0d9a01662fe912346a954a6cb9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "anime-Animexin",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime-Animexin.cs3",
+      "version": 1,
+      "fileHash": "sha256-d97914753865daabfad7f5635ec701ba0dd642ea69a6b21581064aae300ea0cd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "anime-Anineko",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/anime-Anineko.cs3",
+      "version": 1,
+      "fileHash": "sha256-d2dae5854ad033de4a9cd76ec2c0dfa52eb28053e78c786cf84297af68945aec",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-AniKoto",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-AniKoto.cs3",
+      "version": 1,
+      "fileHash": "sha256-19459acd32422bce4f72ab830d902f063afa4f1a90766a6a9d6559ee54b5e312",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-AnimeSuge",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-AnimeSuge.cs3",
+      "version": 1,
+      "fileHash": "sha256-1b2333c6b01909f8d3dc71678289e4f35a1fcab0dd690779eb62656cf7992a1d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-BilibiliProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-BilibiliProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-7a3f1868e58bc4cb1afdb4574db78411d73c2b158029f84950427b0c85206c3c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-CNC_Verse",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-CNC_Verse.cs3",
+      "version": 1,
+      "fileHash": "sha256-61dce8378f02424fb50a214f4b7b5fd62ab62c36736432627ff808b245043507",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-CNC_Verse_Mobile",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-CNC_Verse_Mobile.cs3",
+      "version": 1,
+      "fileHash": "sha256-91a6206f1ed1fb852a9ac2d54fd1cc9dde0cee0ac59223950aeba5ac9744e4a7",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-CineTvProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-CineTvProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-883bc02309c6da77f18f214202f9aa9353913cb36faa20ec642ccedcc692abaf",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-CricifyProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-CricifyProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-e322a50351055951fd1206260f144451ec17b8d2766986b13c5f7addade9574c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-DesiSerialsProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-DesiSerialsProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-12772e3aa0afd2b16f3c3b6467a93551b817c811aeadf09e7c368661457b4dce",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-DoFlixProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-DoFlixProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-762c68a468a8ba03bb847904f10ac8ca4842aa33e590848f5d782de7d4d2d771",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-EinthusanProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-EinthusanProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-61beb2c31a559cbc10192b145856b180108c4b99f077577b2b6bd8ecdfa09748",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-GoldenAudiobook",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-GoldenAudiobook.cs3",
+      "version": 1,
+      "fileHash": "sha256-c3d0a5fd6e39ee64e0a497abd57047efd939278ccf840ef924f3e7ce2229031d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-HDOProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-HDOProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-fe629aceb38d5404cdbeffaefe551b4058e6dc76fdf9400aa547ec6c2e573ce0",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-HDrezkaProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-HDrezkaProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-c041bc3c5f50ef029261885831258ef09f75cabc09f54ae3fbd251a86e082e32",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-LibriVoxAudiobook",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-LibriVoxAudiobook.cs3",
+      "version": 1,
+      "fileHash": "sha256-d8bfa6f610ac84155e2c2f1f7ddb3f639c0741247ea963f17306885e3e89592c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-LivXowProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-LivXowProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-1c2a86147baae3ec966924d5ce803607d81aec28057bd136f8880c99975e7b7e",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-M3UPlaylistPlayerProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-M3UPlaylistPlayerProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-9d62c5a6d518890472c1f5e6fa3e4f1f4c51703a5a7a1634ec5ab6db41e0336a",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-MLSBDProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-MLSBDProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-325ba3020344f48e3d18b7f877b7eb9c3aad1dbf2b94dd74ed541507b151900f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-MovieBoxProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-MovieBoxProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-e67f16e6638e57670e0364d72bfb627c12d577f81e28cf7ae534e9041d7bce81",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-MovieBoxProviderIN",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-MovieBoxProviderIN.cs3",
+      "version": 1,
+      "fileHash": "sha256-c5b59a26780983de2b53694a0858fa115fe2dbd8cedb79a6afa482cf1945c882",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-MovieLinkBDProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-MovieLinkBDProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-9874eab8f55c589a19110f2997299f9f9722ac865cbb308e1a4731bd0110e6f9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-MoviezwapProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-MoviezwapProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-029dcce347a05f2a41becb90fd7b658393d6d89100ace2e97b52b01cfc8349ae",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-PikashowProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-PikashowProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-1375d18dfc913d2e03036c1aeeccfb46ee266108a6e2e467b7d6f3f4b2ff6d2d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-PlayFyProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-PlayFyProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-118fbd727a411069f8c2c44c6da229b6e9e632d0f7d04abfa0f764d91f8b2e97",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-PlayZTVProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-PlayZTVProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-957fddfdacf390ffbc367ab0015d04dec4954599a91153e5aa1f5b5805c427db",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-RadioIndiaProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-RadioIndiaProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-f2d13edbc8f8b131c1e9cfefd67afd11cc9149538590e3fbe967eddd18cb23bc",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-Rtally",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-Rtally.cs3",
+      "version": 1,
+      "fileHash": "sha256-4e330da8d665137462760176e179b07c08b0f0c26ca6dbdca008d276a49ddaa2",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-SKTechProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-SKTechProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-e2cea4be319089923711c688750d72cf94bcc5622aa64dc550b6f4ac415dc788",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-SportzxProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-SportzxProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-33cb31d2807de73a3a0e4a779ceceb49584828b04c54ca41d108fb173cad1537",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-StreamFlixProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-StreamFlixProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-088656562420b65e6b5395235659ec16a87251a58762d3063b90331051780529",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-TamilDhoolProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-TamilDhoolProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-a3a57503562d9109a94d1a2cd4e720f3fa1f93530f6f7c102e65565b2f328fdc",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-TamilUltraProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-TamilUltraProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-2f8ff86feb4c181e7a405bb7981d9173dd358794777cbc9ec83b805496b80270",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-Tamilian",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-Tamilian.cs3",
+      "version": 1,
+      "fileHash": "sha256-1e5cdce0eb999a67d58151508a85098fdb75acdbbbac954256833c63bfe0334d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-Watch32",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-Watch32.cs3",
+      "version": 1,
+      "fileHash": "sha256-6458eca31cd714259fb543e708c85db91424d838becb54d207965a923ecc0e5a",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "cncverse-XonProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/cncverse-XonProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-5535c16b48180971065fdace2fec226f2d7e9b8433349dc594a52de41f0adc96",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AllMovieLandProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AllMovieLandProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-71188bfe509c9ab32f643801aa46c261f69b2790a7537ed85be8e24f2de4dc8f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AllWish",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AllWish.cs3",
+      "version": 1,
+      "fileHash": "sha256-a61d09364fb1818ee88ad7ac9a95977949d473da4d1820c1784139ca403564da",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AniDb",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AniDb.cs3",
+      "version": 1,
+      "fileHash": "sha256-8cc5d15adbbd9754ed1142103a8aa5df0b95665073fa1ae6437a297875b53106",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AniKoto",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AniKoto.cs3",
+      "version": 1,
+      "fileHash": "sha256-3617b3b40397e6124739748f3d8b27bacbb0ca94b7cc26ca6f06b77d3c93a265",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Anichi",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Anichi.cs3",
+      "version": 1,
+      "fileHash": "sha256-e77e6915a44482c5cecd5cbf983b3ea8ded02e3c1df371c0cda36437867ee167",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Anikage",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Anikage.cs3",
+      "version": 1,
+      "fileHash": "sha256-dbff9aa3d805b570e03157dd5293ec1617cd4a1443e8f858d0d5e3ac40044901",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AnimeCloud",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AnimeCloud.cs3",
+      "version": 1,
+      "fileHash": "sha256-d0f2815be7d24ec692dfc5b906a5619b9b9e0c9fb8b6f064f2bda07bf24f5d32",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AnimeDekhoProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AnimeDekhoProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-1a1a634bbda459aa8aa08d6a54b9d1eb4f63d555def1c1c06a6ec12a534fc0b5",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-AnimePahe",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-AnimePahe.cs3",
+      "version": 1,
+      "fileHash": "sha256-c895ef34d2e079e1c678de21553361d4494136e58722581aebffe1a7134f88dd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animeav1",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animeav1.cs3",
+      "version": 1,
+      "fileHash": "sha256-fbd416e7a3af85242f954e6e86f24efc930d7a621e66c1fefaad765b18d9ddfe",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animedubhindi",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animedubhindi.cs3",
+      "version": 1,
+      "fileHash": "sha256-7a555ae905aabf3bb1ebb9a252c2a966e18a0fb89ece63ad1a38a5bffa5dedc1",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animekhor",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animekhor.cs3",
+      "version": 1,
+      "fileHash": "sha256-416016cfbf4f4e2e9704037d19de089234c6fd0d9a01662fe912346a954a6cb9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animenosub",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animenosub.cs3",
+      "version": 1,
+      "fileHash": "sha256-260d948075e916ad9e8b95d10b6f03ddb60b8dfaa94e4d7893607f80a5cd773d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animesalt",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animesalt.cs3",
+      "version": 1,
+      "fileHash": "sha256-0f37ac640ed0a09333cd968b8e0412da4986a7de4de0e4ddebc0d330a5364286",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Animexin",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Animexin.cs3",
+      "version": 1,
+      "fileHash": "sha256-d97914753865daabfad7f5635ec701ba0dd642ea69a6b21581064aae300ea0cd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Anineko",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Anineko.cs3",
+      "version": 1,
+      "fileHash": "sha256-d2dae5854ad033de4a9cd76ec2c0dfa52eb28053e78c786cf84297af68945aec",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Aniworld",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Aniworld.cs3",
+      "version": 1,
+      "fileHash": "sha256-c5fdc39249c7723376208b18f07a353435dcfccdb1838e494241168969e5f915",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Anizone",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Anizone.cs3",
+      "version": 1,
+      "fileHash": "sha256-1b26e83137951351ab9a65d26c75c8ac3a755b770260ff17cfd720ffa126003f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-BanglaPlex",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-BanglaPlex.cs3",
+      "version": 1,
+      "fileHash": "sha256-3662c1a665438289780c9dbd3430ac070716b10dcc1850e3671a31c5577064c9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Cinefreak",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Cinefreak.cs3",
+      "version": 1,
+      "fileHash": "sha256-5f21d445b3e6d4b325d876a85cbdd51f68c1b2c031ecdc31058e4fe3db9afa07",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Cinemacity",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Cinemacity.cs3",
+      "version": 1,
+      "fileHash": "sha256-a67dc64577ff1f72c1bb7b2ab3c2a3f16587ccb6128265e7a22c19cfc1fa84e2",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Coflix",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Coflix.cs3",
+      "version": 1,
+      "fileHash": "sha256-54219daa4174a50c041f0424aeb891a5c6de7aa10e16c751b7aaf6807e67b993",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Desicinemas",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Desicinemas.cs3",
+      "version": 1,
+      "fileHash": "sha256-36847f62870c8b149ce23675c7f2678572721360856869f468ad05f9cb39343e",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Donghuastream",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Donghuastream.cs3",
+      "version": 1,
+      "fileHash": "sha256-447f37fdf8dfc03c8f68d5929222753b7475ca298916901ec5a743ba4213c2fd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-DoraBash",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-DoraBash.cs3",
+      "version": 1,
+      "fileHash": "sha256-18d715b9f18ad5d6a208295b2daa47cc1d2d3ad324451933fa38c9396b29c5cb",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-DudeFilms",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-DudeFilms.cs3",
+      "version": 1,
+      "fileHash": "sha256-87f5646bc7f4da41dbb97c47dc12097be0a1e4ebb8401efc8bd6244d896b86a9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Fibwatch",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Fibwatch.cs3",
+      "version": 1,
+      "fileHash": "sha256-37fd643fcd4f6c7feb59455c88439b70d4e80dab3c5206194d17a74248807942",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Fivemovierulz",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Fivemovierulz.cs3",
+      "version": 1,
+      "fileHash": "sha256-3c0b3fdd65cba011cae921eb0ba64917d96b9a49bb8784be3345816f7ed5a63e",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-FourKHDHub",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-FourKHDHub.cs3",
+      "version": 1,
+      "fileHash": "sha256-373cb3547337882551a01eb494555dcebf56a67d144fe8e0c8a16a43fc946007",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Goojara",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Goojara.cs3",
+      "version": 1,
+      "fileHash": "sha256-e9efe910b6a67fe86c12e2eb12f29d36748df654d759dd1b8cb01fe12d757d6c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-HDhub4u",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-HDhub4u.cs3",
+      "version": 1,
+      "fileHash": "sha256-920dd54c95a00503c275a1b80deb5fdc73969cf10ca2f839dcbe62e36afd755c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Hdmovie2",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Hdmovie2.cs3",
+      "version": 1,
+      "fileHash": "sha256-c466b7f532b9fbc651d0538f44d0ed1dbb0bf79060b2b287c1589a8f1d76557d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Hindmoviez",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Hindmoviez.cs3",
+      "version": 1,
+      "fileHash": "sha256-9e10722021bbd3b6b4ecff05f228e0dfe5bd2702dbea19d1472b762e77483693",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-IPTVPlayer",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-IPTVPlayer.cs3",
+      "version": 1,
+      "fileHash": "sha256-a4860f577c7f10369ecb9cf2140030b5730781a2cb53311f032c9da5daf57ef4",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-IStreamFlare",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-IStreamFlare.cs3",
+      "version": 1,
+      "fileHash": "sha256-8e6dc3200f5be21ec83317bcf66b4706e820603a54aea226019235824957388c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-IdlixProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-IdlixProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-c49e040e19beae60bdf9108fe905550a447441517852798a896148c0007eebb8",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Jellyfin",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Jellyfin.cs3",
+      "version": 1,
+      "fileHash": "sha256-ce590e3ac2006cca86365fae212f94c677e531f27dd9618aff973d6bdf3cbf12",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Kickassanime",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Kickassanime.cs3",
+      "version": 1,
+      "fileHash": "sha256-280a6e226ac5fbe749290a87f63e51c6cd0fcd0e8b35ac9fca5b6093c71c6596",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-KisskhProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-KisskhProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-704c6cf68da9235853d7b468f372e11fc65c7763c57d4e0295b79b5db5d74875",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Latanime",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Latanime.cs3",
+      "version": 1,
+      "fileHash": "sha256-7e0c0624e1ab78e4084f6ebba96918595d2d20c036ad1b6f929a85539c004da5",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-LayarKacaProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-LayarKacaProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-35c0db4dd49b38d05dc01b861b59604ba0d5178b8a6434a574674e19baf2c58c",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-MPlayerProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-MPlayerProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-4d2de9c93f154b28c75b42a12dc30a3c03a6743ae26af145796bc7eca43358cd",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-MassTamilanProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-MassTamilanProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-19c3e1d3109ca29393721de18e5432b476201cb9f4073f4753869e3ff0e787a5",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Megakino",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Megakino.cs3",
+      "version": 1,
+      "fileHash": "sha256-b05002099f34ab20f0a3ffce04bf56591508f0531280a3e478bb21408bb70cfb",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Microtv",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Microtv.cs3",
+      "version": 1,
+      "fileHash": "sha256-acfb382b952322dfcd2a8cca1270ff9756089be891a36621eabe83f035c704ca",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-MovieBoxProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-MovieBoxProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-b51b74a70ae669f81304cc1a41fb2a1f09e220226bc3b69c73e6067f69b14956",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Movies4u",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Movies4u.cs3",
+      "version": 1,
+      "fileHash": "sha256-0a9250fa15680b9062b161b4a3c7eec8c6c4449e16e6b2fe6b988edd3bde1897",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-MultiMoviesProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-MultiMoviesProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-0ff303c715c8f2e7d19eccea2e000e33692c3d702cd7a1ed70a0126913b2cfb4",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Netcinez",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Netcinez.cs3",
+      "version": 1,
+      "fileHash": "sha256-c8cbbaca64820af03ca54c572f7a66172732f870307a96a8bf4a6d29a9d7f4b8",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-OHLI24",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-OHLI24.cs3",
+      "version": 1,
+      "fileHash": "sha256-18b36cc02d5b5681d003776340849662583ac0ba101864af637cfc566ac0146e",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-OnePace",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-OnePace.cs3",
+      "version": 1,
+      "fileHash": "sha256-0b4e9eaa53e2063d6b4db4b348a119daaec9b843bec6361ffd2412e6c7223ba3",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-OneTouchTV",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-OneTouchTV.cs3",
+      "version": 1,
+      "fileHash": "sha256-ce5293547dfc6100408fdc3ea2e748980b1d3b2b75d8f979a2d95c5f657a8938",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Pencurimovie",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Pencurimovie.cs3",
+      "version": 1,
+      "fileHash": "sha256-fecebd637dbe4a6337298a55ad1ddab0f79d8b1288a607be7f1ee026e4fd1203",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Pinoymoviepedia",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Pinoymoviepedia.cs3",
+      "version": 1,
+      "fileHash": "sha256-ad632e963f94229e3398d3cd9e44d20f1b3bf735a6a6d4d86574588120c8c455",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Piratexplay",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Piratexplay.cs3",
+      "version": 1,
+      "fileHash": "sha256-20f1fe1fd8496563c1d7528a40cbc6a39d2079fc2b3016e1f9d9946eb09668c1",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Pmsm",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Pmsm.cs3",
+      "version": 1,
+      "fileHash": "sha256-6970ec21d8a98a5da2150d831e4264e9ddf3f2390e0638ebcba5db87ba86ad10",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-PublicSportsIPTV",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-PublicSportsIPTV.cs3",
+      "version": 1,
+      "fileHash": "sha256-616e973892dd662566539470c0646f0e5c33b1e4e7e44c97841699cc7a42fe35",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-QuickIPTV",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-QuickIPTV.cs3",
+      "version": 1,
+      "fileHash": "sha256-c2550713bd9765a5ec84a68cf3b4ba31b23e82bda0d4ebb0b2ee2def6b9c56ae",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-RingZ",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-RingZ.cs3",
+      "version": 1,
+      "fileHash": "sha256-7e98805c4661d7bbae590b660781a95423941dfac4c19a361d886b8562f1e46a",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-ShowBox",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-ShowBox.cs3",
+      "version": 1,
+      "fileHash": "sha256-a5a04f37a4d5f66bff5315cda633dd6237423bedab537b54140994594b4aa0f6",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-StreamPlay",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-StreamPlay.cs3",
+      "version": 1,
+      "fileHash": "sha256-01c6f397e8ef1b881c30798b58670789824eaade2e34cff8d2e6557112f77468",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-StremioAddon",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-StremioAddon.cs3",
+      "version": 1,
+      "fileHash": "sha256-da117907965665b9b23338dbf1fddfb7cf2995db290afecdbf44971ab67ba38d",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-StremioX",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-StremioX.cs3",
+      "version": 1,
+      "fileHash": "sha256-bce20c652bab6d8a8ca1a76c30733b5a9e7758e46c8e32606115fe905a5a5ade",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-SuperStream",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-SuperStream.cs3",
+      "version": 1,
+      "fileHash": "sha256-780ff0ca943e812198a279a04f2ce560cba372f2090a44fb388df5e2414e2585",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Tamilblasters",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Tamilblasters.cs3",
+      "version": 1,
+      "fileHash": "sha256-3ca2ec27d7a548e7bd42781351fb3d3db1a11778b360300369198725ba00a37e",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-ToonHub",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-ToonHub.cs3",
+      "version": 1,
+      "fileHash": "sha256-d5967d52343c71036c1f6e15aa58914ced69268982dd81dc767c085fcfbd1e49",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-ToonTales",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-ToonTales.cs3",
+      "version": 1,
+      "fileHash": "sha256-147ed013c663cfebca2d79e848bbcb1ba37f27ef82c44447611cb16f29e30f46",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Toonstream",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Toonstream.cs3",
+      "version": 1,
+      "fileHash": "sha256-a45a967aa8e7858b6550d267302193d9411189123cae5fc026da30d9f2e05315",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Topcartoons",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Topcartoons.cs3",
+      "version": 1,
+      "fileHash": "sha256-79335bb5845b1cc4b4f60d45d6dedd390076e8a2668f505d223f14ae17a1f689",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Topstreamfilm",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Topstreamfilm.cs3",
+      "version": 1,
+      "fileHash": "sha256-881dcdb7a781f88ecf5d7f9d766afab4c2f469045155d06f108e845a54c86119",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-TorraStream",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-TorraStream.cs3",
+      "version": 1,
+      "fileHash": "sha256-ca27823cc3ecd706c086d87973e913a8ece104ef72b17983456c0ebb6e38943f",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-UHDmoviesProvider",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-UHDmoviesProvider.cs3",
+      "version": 1,
+      "fileHash": "sha256-851fcceb58ed47033ecd90bc922b1ad856de724b859869d9396b254abc4a5b38",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Ultima",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Ultima.cs3",
+      "version": 1,
+      "fileHash": "sha256-60de5aa1b0b1edeca3a663cf6194503fc3ea910b339874bc2a26c8a81da0e3fe",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-XDMovies",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-XDMovies.cs3",
+      "version": 1,
+      "fileHash": "sha256-36a2d5149ca2d84c556292a7ed464d487251431b162ab8d7c26e9c1907fe73a9",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-YTS",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-YTS.cs3",
+      "version": 1,
+      "fileHash": "sha256-fec6047e1f2ab2015edd07163918061c6514617a3c6609175e32ac8c100fb755",
+      "tvTypes": ["movie"]
+    },
+    {
+      "name": "phisher-Zinkmovies",
+      "description": "Native CloudStream .cs3 extension (auto-built from this repo).",
+      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/phisher-Zinkmovies.cs3",
+      "version": 1,
+      "fileHash": "sha256-a607244997e9861f8c2718584a7dc1b77b5fe99a98c9c48193eb7380c81b27bf",
+      "tvTypes": ["movie"]
+    }
+  ]
+}
