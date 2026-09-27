@@ -218,7 +218,13 @@ abstract class Cs3BridgeProvider(
     private fun indexAfter(id: String, prefix: String): Int? =
         id.removePrefix(prefix).substringBefore(':').takeIf { id.startsWith(prefix) }?.toIntOrNull()
 
-    override suspend fun catalogs(): List<HikariCatalog> = withContext(Dispatchers.IO) {
+    // `HikariProvider.catalogs()` is a PLAIN (blocking) function — the app
+    // declares it non-suspend, so the class the extension is dexed from has to
+    // match or the whole extension refuses to load. The row fetch below is
+    // network work, so it runs on Dispatchers.IO inside runBlocking rather than
+    // on whatever thread the app happened to call us from.
+    override fun catalogs(): List<HikariCatalog> = kotlinx.coroutines.runBlocking {
+        withContext(Dispatchers.IO) {
         val a = requireApi()
         val pages = try {
             a.mainPage
@@ -265,6 +271,7 @@ abstract class Cs3BridgeProvider(
         if (distinct.isEmpty()) throw failed("its plugin returned no home page")
         lastFailure = null
         distinct
+        }
     }
 
     private suspend fun fetchRows(a: MainAPI, name: String, data: String, page: Int): List<HomePageList> {
@@ -790,7 +797,14 @@ abstract class Cs3BridgeProvider(
     private fun resolveHostActivity(ctx: Context): Context {
         fun usable(c: Context?): Boolean {
             val a = c as? android.app.Activity ?: return false
-            return !a.isFinishing && !a.isDestroyed
+            if (a.isFinishing) return false
+            // Activity.isDestroyed is API 17+ and the android.jar this compiles
+            // against is 4.1.1 (API 15), so ask for it reflectively. On an older
+            // device the method is simply not there and the answer stays "usable".
+            val destroyed = runCatching {
+                android.app.Activity::class.java.getMethod("isDestroyed").invoke(a) as? Boolean
+            }.getOrNull()
+            return destroyed != true
         }
         fun current(): Context? {
             HikariApp.mainActivity?.let { if (usable(it)) return it }
