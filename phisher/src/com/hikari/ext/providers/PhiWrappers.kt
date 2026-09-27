@@ -182,13 +182,6 @@ class PhiCinemacity : Cs3BridgeProvider(
     name = "Cinemacity (Phisher)",
 )
 
-class PhiCloudPlay : Cs3BridgeProvider(
-    cs3Resource = "cs3/phi/CloudPlay.cs3",
-    apiIndex = 0,
-    id = "phi|cloudplay",
-    name = "CloudPlay (Phisher)",
-)
-
 class PhiCoflix : Cs3BridgeProvider(
     cs3Resource = "cs3/phi/Coflix.cs3",
     apiIndex = 0,
@@ -383,13 +376,6 @@ class PhiMicrotv : Cs3BridgeProvider(
     apiIndex = 0,
     id = "phi|microtv",
     name = "Microtv (Phisher)",
-)
-
-class PhiMovieBlast : Cs3BridgeProvider(
-    cs3Resource = "cs3/phi/MovieBlast.cs3",
-    apiIndex = 0,
-    id = "phi|movieblast",
-    name = "MovieBlast (Phisher)",
 )
 
 class PhiMovieBoxProvider : Cs3BridgeProvider(

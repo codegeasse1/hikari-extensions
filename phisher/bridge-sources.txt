@@ -19,7 +19,6 @@ Anizone.cs3	Anizone.cs3
 BanglaPlex.cs3	BanglaPlex.cs3
 Cinefreak.cs3	Cinefreak.cs3
 Cinemacity.cs3	Cinemacity.cs3
-CloudPlay.cs3	CloudPlay.cs3
 Coflix.cs3	Coflix.cs3
 Desicinemas.cs3	Desicinemas.cs3
 Donghuastream.cs3	Donghuastream.cs3
@@ -44,7 +43,6 @@ MPlayerProvider.cs3	MPlayerProvider.cs3
 MassTamilanProvider.cs3	MassTamilanProvider.cs3
 Megakino.cs3	Megakino.cs3
 Microtv.cs3	Microtv.cs3
-MovieBlast.cs3	MovieBlast.cs3
 MovieBoxProvider.cs3	MovieBoxProvider.cs3
 Movies4u.cs3	Movies4u.cs3
 MultiMoviesProvider.cs3	MultiMoviesProvider.cs3

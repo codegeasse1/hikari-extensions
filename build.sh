@@ -91,8 +91,15 @@ for dir in */; do
   # upstream repos' builds branches at build time — they're third-party
   # artifacts that change often, and pinning them in git would bloat the repo.
   # bridge-cs3.conf names the source repo + packaged subdir; bridge-sources.txt
-  # lists "<upstream path>\t<packaged filename>" lines. A failed fetch aborts
-  # the build (a missing .cs3 means broken providers).
+  # lists "<upstream path>\t<packaged filename>" lines. A file that has
+  # disappeared upstream is SKIPPED with a warning rather than aborting the
+  # build: upstream authors delete/rename .cs3 files all the time, and when that
+  # killed the build it also killed the release of every OTHER extension in this
+  # repo (the whole run fails, nothing is published, and no device can ever pick
+  # up a fix to anything). A skipped file simply means the wrapper class that
+  # points at it reports its own "its plugin archive has no <path>" reason at
+  # load instead of the extension silently losing a provider. Missing files are
+  # listed again at the end of the build, and the run still succeeds.
   if [ -f "$name/bridge-cs3.conf" ] && [ -f "$name/bridge-sources.txt" ]; then
     urlencode() {
       local s="$1" enc="" c h
@@ -111,9 +118,14 @@ for dir in */; do
     while IFS=$'\t' read -r upstream packaged; do
       [ -z "$upstream" ] && continue
       packaged="${packaged:-$upstream}"
-      curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "build/pkg/cs3/$bridge_subdir/$packaged" \
-        "https://raw.githubusercontent.com/$bridge_repo/builds/$(urlencode "$upstream")"
-      cp "build/pkg/cs3/$bridge_subdir/$packaged" "$NATIVE_CS3_DIR/${name}-${packaged}"
+      if curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "build/pkg/cs3/$bridge_subdir/$packaged" \
+        "https://raw.githubusercontent.com/$bridge_repo/builds/$(urlencode "$upstream")"; then
+        cp "build/pkg/cs3/$bridge_subdir/$packaged" "$NATIVE_CS3_DIR/${name}-${packaged}"
+      else
+        rm -f "build/pkg/cs3/$bridge_subdir/$packaged"
+        echo "::warning file=$name/bridge-sources.txt::upstream .cs3 not found, skipped: $bridge_repo@builds/$upstream"
+        MISSING_CS3="${MISSING_CS3:-} $name/$upstream"
+      fi
     done < "$name/bridge-sources.txt"
   fi
 
@@ -141,6 +153,10 @@ done
 if [ -z "$BUILT" ]; then
   echo "no extensions found" >&2
   exit 1
+fi
+
+if [ -n "${MISSING_CS3:-}" ]; then
+  echo "WARNING: upstream .cs3 files that no longer exist were skipped:$MISSING_CS3"
 fi
 
 # 5) regenerate repo.json from the built .hiki files + their manifests
