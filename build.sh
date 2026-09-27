@@ -164,6 +164,7 @@ generate_repo_json() {
     printf '      "description": "%s",\n' "Auto-built Hikari extension from this repo."
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.hiki",\n' "$name"
     printf '      "version": %s,\n' "$ver"
+    printf '      "fileHash": "sha256-%s",\n' "$(sha256sum "$name.hiki" | cut -d' ' -f1)"
     printf '      "tvTypes": [%s]\n' "$tvtypes"
     printf '    }'
   done
@@ -178,6 +179,7 @@ generate_repo_json() {
     printf '      "description": "%s",\n' "Native CloudStream .cs3 extension (auto-built from this repo)."
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s",\n' "$_b"
     printf '      "version": 1,\n'
+    printf '      "fileHash": "sha256-%s",\n' "$(sha256sum "$nf" | cut -d' ' -f1)"
     printf '      "tvTypes": ["movie"]\n'
     printf '    }'
   done
@@ -209,6 +211,7 @@ generate_repo_desktop_json() {
     printf '      "description": "%s",\n' "Auto-built Hikari desktop extension from this repo."
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s.jar",\n' "$name"
     printf '      "version": %s,\n' "$ver"
+    printf '      "fileHash": "sha256-%s",\n' "$(sha256sum "$name.jar" | cut -d' ' -f1)"
     printf '      "tvTypes": [%s]\n' "$tvtypes"
     printf '    }'
   done
@@ -223,6 +226,7 @@ generate_repo_desktop_json() {
     printf '      "description": "%s",\n' "Native CloudStream .cs3 extension (auto-built from this repo)."
     printf '      "url": "https://github.com/codegeasse1/hikari-extensions/releases/download/continuous/%s",\n' "$_b"
     printf '      "version": 1,\n'
+    printf '      "fileHash": "sha256-%s",\n' "$(sha256sum "$nf" | cut -d' ' -f1)"
     printf '      "tvTypes": ["movie"]\n'
     printf '    }'
   done
