@@ -52,7 +52,7 @@ Or download `chaturbate.hiki` and use **Pick .hiki file**.
 | `hanimetv.hiki` | Curated 720p/1080p hentai from hanime.tv — Recent Uploads, New Releases, Trending and Random home rows. Streams are captured in a real WebView (Cloudflare). |
 | `hstream.hiki` | English-subbed hentai in HD/FHD/4K from hstream.moe — 7 order-based browse rows and working search, DASH streams captured in a real WebView. |
 | `cncverse.hiki` | The whole CNC Verse repo as **49 providers** — CNC Verse (Disney+/Netflix/Prime/Hotstar mirrors), MovieBox, TamilDhool, Tamilian, Pikashow, Cricify, HDrezka, Golden Audiobook and more. |
-| `phisher.hiki` | The whole phisher98 repo as **101 providers** — MovieBlast, Movies4u, StreamPlay, StremioX, ShowBox, TorraStream, Kickassanime, Animexin, QuickIPTV (Sony/Japan/Sports/Pirate IPTV), YTS, Tamilblasters and more. |
+| `phisher.hiki` | The whole phisher98 repo as **99 providers** — Movies4u, StreamPlay, StremioX, ShowBox, TorraStream, Kickassanime, Animexin, QuickIPTV (Sony/Japan/Sports/Pirate IPTV), YTS, Tamilblasters and more. |
 
 ## CloudStream bridge extensions
 
@@ -62,12 +62,23 @@ compiled `.cs3` files** and load them through Hikari's real CloudStream runtime
 logic all run unmodified, exactly as if the `.cs3` had been installed directly).
 Each `.cs3` becomes one or more providers (`src/…/Cs3BridgeProvider.kt` adapts a
 plugin's `MainAPI` to the Hikari SDK; the manifest registers one wrapper class
-per provider). This is why every extension in those two repos is available the
-moment this release ships, no porting needed.
+per provider). This is why the providers in each bridge dir's
+`bridge-sources.txt` are available the moment this release ships, no porting
+needed — that file names the subset of the upstream repo this extension
+carries, so a `.cs3` added upstream is not bundled until it is listed there (and
+one it deletes is skipped — see below).
 
 At build time `build.sh` downloads the `.cs3` files fresh from the upstream
 repos' `builds` branches (see each bridge dir's `bridge-sources.txt`), so every
-CI build ships the current upstream builds.
+CI build ships the current upstream builds. A file the upstream repo has
+removed or renamed since is **skipped with a warning**, not a build failure —
+upstream deletes `.cs3` files often, and one stale path must not stop every
+other extension in this repo from being published. Skips are listed again at
+the end of the build log.
+
+`repo.json` carries a `sha256-…` **`fileHash`** for every entry. Hikari's
+update check skips any entry without one, so a repository that omits it can
+never offer an update to an already-installed extension.
 
 Installing both alongside the same providers installed natively as `.cs3` will
 show duplicates — disable one set in Settings → Providers.
