@@ -1,0 +1,6 @@
+{
+  "name": "StreamedPk",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.StreamedPkProvider",
+  "tvTypes": ["series", "movie"]
+}

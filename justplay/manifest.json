@@ -1,0 +1,6 @@
+{
+  "name": "JustPlay",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.JustPlayProvider",
+  "tvTypes": ["series", "movie"]
+}

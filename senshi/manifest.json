@@ -1,0 +1,6 @@
+{
+  "name": "Senshi",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.SenshiProvider",
+  "tvTypes": ["series", "movie"]
+}

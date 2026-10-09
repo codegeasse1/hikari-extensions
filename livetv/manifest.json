@@ -1,0 +1,6 @@
+{
+  "name": "LiveTV",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.LiveTVProvider",
+  "tvTypes": ["series", "movie"]
+}

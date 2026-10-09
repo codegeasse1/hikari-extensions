@@ -1,0 +1,6 @@
+{
+  "name": "TorrentsV1",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.TorrentsV1Provider",
+  "tvTypes": ["series", "movie"]
+}

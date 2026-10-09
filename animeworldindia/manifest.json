@@ -1,0 +1,6 @@
+{
+  "name": "AnimeWorldIndia",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimeWorldIndiaProvider",
+  "tvTypes": ["series", "movie"]
+}

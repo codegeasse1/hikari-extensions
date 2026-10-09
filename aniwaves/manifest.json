@@ -1,0 +1,6 @@
+{
+  "name": "AniWaves",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AniWavesProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ReAnime",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.ReAnimeProvider",
+  "tvTypes": ["series", "movie"]
+}

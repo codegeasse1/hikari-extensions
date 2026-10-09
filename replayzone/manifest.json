@@ -1,0 +1,6 @@
+{
+  "name": "ReplayZone",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.ReplayZoneProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Animo",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimoProvider",
+  "tvTypes": ["series", "movie"]
+}

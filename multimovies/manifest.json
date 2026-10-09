@@ -1,0 +1,6 @@
+{
+  "name": "Multimovies",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.MultimoviesProvider",
+  "tvTypes": ["series", "movie"]
+}

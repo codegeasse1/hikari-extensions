@@ -1,0 +1,6 @@
+{
+  "name": "Kdesa",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.KdesaProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "RareAnimesIndia",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.RareAnimesIndiaProvider",
+  "tvTypes": ["series", "movie"]
+}

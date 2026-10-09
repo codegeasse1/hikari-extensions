@@ -1,0 +1,6 @@
+{
+  "name": "Miruro",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.MiruroProvider",
+  "tvTypes": ["series", "movie"]
+}
