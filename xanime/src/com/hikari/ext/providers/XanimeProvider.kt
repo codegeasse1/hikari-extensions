@@ -157,6 +157,7 @@ class XanimeProvider : HikariProvider {
                     if (!seen.add(t.url)) null else HikariSubtitle(t.label, t.url)
                 }
             } else emptyList()
+            out.add(
                 HikariStream(
                     name = label,
                     url = source.path,
