@@ -127,7 +127,7 @@ class AniWavesProvider : HikariProvider {
                         val srcBody = HikariNet.getString("$mainUrl/ajax/sources?id=${URLEncoder.encode(linkId, "UTF-8")}&asi=0&autoPlay=0", pageHeaders) ?: continue
                         val embed = JSONObject(srcBody).let { o ->
                             val r = o.optJSONObject("result")
-                            r?.optString("url").ifBlank { o.optString("url") }
+                            (r?.optString("url").orEmpty()).ifBlank { o.optString("url") }
                         }
                         if (embed.isNullOrBlank() || !embed.startsWith("http")) continue
                         val captured = HikariNet.resolveWithWebView(embed, capture, timeoutMs = 45_000)
