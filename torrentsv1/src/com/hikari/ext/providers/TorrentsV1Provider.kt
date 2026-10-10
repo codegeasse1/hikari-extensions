@@ -298,7 +298,8 @@ class TorrentsV1Provider : HikariProvider {
             val kind = o.optString("media_type").takeIf { it == "movie" || it == "tv" } ?: continue
             val id = o.optInt("id", 0)
             if (id == 0) continue
-            val title = (if (kind == "movie") o.optString("title") else o.optString("name")).ifBlank { continue }
+            val title = (if (kind == "movie") o.optString("title") else o.optString("name"))
+            if (title.isBlank()) continue
             val poster = o.optString("poster_path").takeIf { it.isNotBlank() }?.let { TMDB_IMG + it }
             val payload = JSONObject().put("source", "tmdb").put("tmdbId", id)
                 .put("tmdbType", kind).put("title", title)
@@ -485,7 +486,8 @@ class TorrentsV1Provider : HikariProvider {
                 val arr = root.optJSONArray("streams") ?: continue
                 for (i in 0 until arr.length()) {
                     val s = arr.optJSONObject(i) ?: continue
-                    val hash = s.optString("infoHash").ifBlank { continue }
+                    val hash = s.optString("infoHash")
+                    if (hash.isBlank()) continue
                     if (!seen.add("h$hash")) continue
                     val st = s.optString("title").ifBlank { s.optString("name") }
                     val q = Regex("(2160p|1080p|720p|480p)", RegexOption.IGNORE_CASE)

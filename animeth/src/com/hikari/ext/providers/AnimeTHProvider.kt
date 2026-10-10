@@ -190,8 +190,10 @@ class AnimeTHProvider : HikariProvider {
         return buildList {
             for (i in 0 until arr.length()) {
                 val r = arr.optJSONObject(i) ?: continue
-                val slug = r.optString("slug").ifBlank { continue }
-                val title = r.optString("title").trim().ifEmpty { continue }
+                val slug = r.optString("slug")
+                if (slug.isBlank()) continue
+                val title = r.optString("title").trim()
+                if (title.isEmpty()) continue
                 var cover = r.optString("cover")
                 if (cover.isNotBlank() && !cover.startsWith("http")) cover = "$BASE/$cover"
                 add(mediaFor(title, slug, cover.takeIf { it.startsWith("http") }, r.optString("category")))

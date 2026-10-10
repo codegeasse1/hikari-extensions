@@ -317,7 +317,8 @@ class ReAnimeProvider : HikariProvider {
         val out = ArrayList<HikariMedia>()
         for (i in 0 until arr.length()) {
             val e = arr.optJSONObject(i) ?: continue
-            val slug = e.optString("anime_id").ifBlank { continue }
+            val slug = e.optString("anime_id")
+            if (slug.isBlank()) continue
             val t = e.optJSONObject("title")
             val title = t?.optString("english")?.takeIf { it.isNotBlank() }
                 ?: t?.optString("romaji")?.takeIf { it.isNotBlank() }

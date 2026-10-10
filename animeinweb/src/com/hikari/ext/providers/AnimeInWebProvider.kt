@@ -145,8 +145,8 @@ class AnimeInWebProvider : HikariProvider {
             for (i in 0 until arr.length()) {
                 val attrs = arr.optJSONObject(i)?.optJSONObject("attributes") ?: continue
                 val pi = attrs.optJSONObject("posterImage") ?: continue
-                val url = pi.optString("large").ifBlank { pi.optString("medium") }
-                    .ifBlank { pi.optString("small") }.ifBlank { continue }
+                val url = pi.optString("large").ifBlank { pi.optString("medium") }.ifBlank { pi.optString("small") }
+                if (url.isBlank()) continue
                 val titles = attrs.optJSONObject("titles")
                 val cands = listOfNotNull(
                     attrs.optString("canonicalTitle").ifBlank { null },

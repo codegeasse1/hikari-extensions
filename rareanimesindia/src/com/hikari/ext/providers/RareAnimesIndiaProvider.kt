@@ -539,7 +539,8 @@ class RareAnimesIndiaProvider : HikariProvider {
             val children = content.optJSONObject("data")?.optJSONObject("children") ?: return
             for (k in children.keys()) {
                 val child = children.optJSONObject(k) ?: continue
-                val link = child.optString("link").ifBlank { continue }
+                val link = child.optString("link")
+                if (link.isBlank()) continue
                 val name = child.optString("name", "GoFile")
                 if (!seen.add(link)) continue
                 out.add(HikariStream(name = "GoFile $name [$label]", url = link))

@@ -197,14 +197,16 @@ class NetNaijaAppProvider : HikariProvider {
             val out = ArrayList<HikariMedia>()
             for (i in 0 until list.length()) {
                 val m = list.optJSONObject(i) ?: continue
-                val id = m.optString("id").ifBlank { continue }
+                val id = m.optString("id")
+                if (id.isBlank()) continue
                 val t1 = m.optJSONObject("team1")
                 val t2 = m.optJSONObject("team2")
                 val n1 = t1?.optString("name") ?: "Team 1"
                 val n2 = t2?.optString("name") ?: "Team 2"
                 val status = m.optString("status")
                 if (status == "MatchEnded" || status == "2" || status == "FT") continue
-                val playPath = m.optString("playPath").ifBlank { continue }
+                val playPath = m.optString("playPath")
+                if (playPath.isBlank()) continue
                 if (!playPath.startsWith("http")) continue
                 val league = m.optString("league")
                 val title = (if (league.isNotBlank()) "$league: " else "") + "$n1 vs $n2"
@@ -359,7 +361,8 @@ class NetNaijaAppProvider : HikariProvider {
             var firstStreamId: String? = null
             for (st in sorted) {
                 st ?: continue
-                var url = st.optString("url").ifBlank { continue }
+                var url = st.optString("url")
+                if (url.isBlank()) continue
                 val format = st.optString("format")
                 val res = st.optString("resolutions")
                 val cookie = st.optString("signCookie").ifBlank { null }
@@ -446,7 +449,8 @@ class NetNaijaAppProvider : HikariProvider {
                 val arr = JSONObject(txt).optJSONObject("data")?.optJSONArray("extCaptions") ?: continue
                 for (i in 0 until arr.length()) {
                     val c = arr.optJSONObject(i) ?: continue
-                    val url = c.optString("url").ifBlank { continue }
+                    val url = c.optString("url")
+                    if (url.isBlank()) continue
                     if (!seen.add(url)) continue
                     subs.add(HikariSubtitle(c.optString("lanName").ifBlank { c.optString("lan", "Unknown") }, url))
                 }

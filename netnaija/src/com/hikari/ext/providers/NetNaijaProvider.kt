@@ -122,7 +122,8 @@ class NetNaijaProvider : HikariProvider {
             val byTitle = LinkedHashMap<String, JSONArray>()
             for (i in 0 until ops.length()) {
                 val s = ops.optJSONObject(i) ?: continue
-                val title = s.optString("title").ifBlank { continue }
+                val title = s.optString("title")
+                if (title.isBlank()) continue
                 val subjects = s.optJSONArray("subjects") ?: continue
                 val ok = JSONArray()
                 for (j in 0 until subjects.length()) {
@@ -417,8 +418,10 @@ class NetNaijaProvider : HikariProvider {
         val seen = HashSet<String>()
         for (i in 0 until dubs.length()) {
             val dub = dubs.optJSONObject(i) ?: continue
-            val dubId = dub.optString("subjectId").ifBlank { continue }
-            val dubPath = dub.optString("detailPath").ifBlank { continue }
+            val dubId = dub.optString("subjectId")
+            if (dubId.isBlank()) continue
+            val dubPath = dub.optString("detailPath")
+            if (dubPath.isBlank()) continue
             val label = sourceLabel(dub) ?: continue
             val playUrl = "$BFF/subject/play?subjectId=$dubId&se=$season&ep=$ep&detailPath=$dubPath"
             val resp = HikariNet.fetch(
@@ -440,9 +443,11 @@ class NetNaijaProvider : HikariProvider {
             if (streams != null) {
                 for (j in 0 until streams.length()) {
                     val st = streams.optJSONObject(j) ?: continue
-                    val url = st.optString("url").ifBlank { continue }
+                    val url = st.optString("url")
+                    if (url.isBlank()) continue
                     if (st.optBoolean("vipLocked")) continue
-                    val res = st.optString("resolutions").ifBlank { continue }
+                    val res = st.optString("resolutions")
+                    if (res.isBlank()) continue
                     if (firstStreamId == null) firstStreamId = st.optString("id").ifBlank { null }
                     val q = res.toIntOrNull()
                     val qLabel = when (q) {
@@ -471,7 +476,8 @@ class NetNaijaProvider : HikariProvider {
             if (hls != null) {
                 for (j in 0 until hls.length()) {
                     val o = hls.optJSONObject(j) ?: continue
-                    val url = o.optString("url").ifBlank { continue }
+                    val url = o.optString("url")
+                    if (url.isBlank()) continue
                     val res = o.optString("resolutions", "0")
                     if (!seen.add(url)) continue
                     out.add(HikariStream(name = "NetNaija $label HLS ${res}p", url = url, headers = playHeaders, isM3u8 = true))
@@ -494,7 +500,8 @@ class NetNaijaProvider : HikariProvider {
             val caps = root.optJSONObject("data")?.optJSONArray("captions") ?: return
             for (i in 0 until caps.length()) {
                 val c = caps.optJSONObject(i) ?: continue
-                val url = c.optString("url").ifBlank { continue }
+                val url = c.optString("url")
+                if (url.isBlank()) continue
                 val lang = c.optString("lanName").ifBlank { c.optString("lan", "Unknown") }
                 subs.add(HikariSubtitle(lang, url))
             }

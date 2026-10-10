@@ -148,7 +148,8 @@ class KyrenProvider : HikariProvider {
                         val sources = root.optJSONArray("sources") ?: return@async null
                         for (i in 0 until sources.length()) {
                             val s = sources.optJSONObject(i) ?: continue
-                            val sourceUrl = s.optString("url").ifBlank { continue }
+                            val sourceUrl = s.optString("url")
+                            if (sourceUrl.isBlank()) continue
                             val provider = s.optString("provider").ifBlank { server }
                             val langLabel = if (s.optBoolean("isDub", false) || s.optString("language") == "dub") "Dub" else "Sub"
                             val q = when (s.optString("quality").lowercase()) {
@@ -178,7 +179,8 @@ class KyrenProvider : HikariProvider {
                         root.optJSONArray("subtitles")?.let { arr ->
                             for (i in 0 until arr.length()) {
                                 val su = arr.optJSONObject(i) ?: continue
-                                val u = su.optString("url").ifBlank { continue }
+                                val u = su.optString("url")
+                                if (u.isBlank()) continue
                                 synchronized(seen) {
                                     if (seen.add("sub:$u")) subs.add(HikariSubtitle(su.optString("label").ifBlank { su.optString("lang").ifBlank { "English" } }, u))
                                 }

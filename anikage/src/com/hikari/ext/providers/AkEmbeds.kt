@@ -62,7 +62,7 @@ object AkEmbeds {
         subtitleOut: (HikariSubtitle) -> Unit,
         linkOut: (HikariStream) -> Unit,
     ): Boolean {
-        val stream = AkMegaPlay.resolveStream(embedUrl, referer, sourceTag) ?: return false
+        val stream = AkMegaPlay.resolveStream(embedUrl, referer) ?: return false
         return AkMegaPlay.emitLinks(
             sourceTag, label, stream.m3u8, "https://${hostOf(embedUrl)}/",
             stream.subtitles, subtitleOut, linkOut,

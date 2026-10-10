@@ -250,7 +250,8 @@ class MiruroProvider : HikariProvider {
             val streams = root.optJSONArray("streams") ?: return out
             for (i in 0 until streams.length()) {
                 val s = streams.optJSONObject(i) ?: continue
-                val url = s.optString("url").ifBlank { continue }
+                val url = s.optString("url")
+                if (url.isBlank()) continue
                 if (!seenUrls.add(url)) continue
                 val referer = s.optString("referer").takeIf { it.isNotBlank() } ?: "${MrPipe.workingDomain()}/"
                 when (s.optString("type")) {
@@ -298,7 +299,8 @@ class MiruroProvider : HikariProvider {
                 val subs = buildList {
                     for (i in 0 until arr.length()) {
                         val su = arr.optJSONObject(i) ?: continue
-                        val u = su.optString("url").ifBlank { continue }
+                        val u = su.optString("url")
+                        if (u.isBlank()) continue
                         add(HikariSubtitle(su.optString("lang").ifBlank { "English" }, u))
                     }
                 }

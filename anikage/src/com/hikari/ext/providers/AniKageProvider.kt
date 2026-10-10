@@ -22,6 +22,8 @@ import java.net.URLEncoder
  * browse/detail/episodes/servers/sources endpoints, PUBLIC_PROXY_URL stream
  * proxy, MegaPlay/Flix/inline/packed embed routing, sub+dup episode tracks.
  */
+private data class AkServer(val id: String, val providerId: String, val subTypes: List<String>)
+
 class AniKageProvider : HikariProvider {
 
     override val id = "anikage"
@@ -207,15 +209,15 @@ class AniKageProvider : HikariProvider {
 
         val serversBody = HikariNet.getString("${api()}/${enc(slug)}/episodes/${enc(epNum)}/servers", apiHeaders())
             ?: return emptyList()
-        data class Server(val id: String, val providerId: String, val subTypes: List<String>)
         val servers = try {
             val arr = JSONObject(serversBody).optJSONArray("servers") ?: return emptyList()
             buildList {
                 for (i in 0 until arr.length()) {
                     val s = arr.optJSONObject(i) ?: continue
-                    val id = s.optString("id").ifBlank { continue }
+                    val id = s.optString("id")
+                    if (id.isBlank()) continue
                     val st = s.optJSONArray("subTypes")?.let { a -> buildList { for (j in 0 until a.length()) add(a.optString(j)) } } ?: emptyList()
-                    add(Server(id, s.optString("providerId").ifBlank { id }, st))
+                    add(AkServer(id, s.optString("providerId").ifBlank { id }, st))
                 }
             }
         } catch (t: Throwable) { return emptyList() }
@@ -248,7 +250,8 @@ class AniKageProvider : HikariProvider {
                         if (subArr != null) {
                             for (i in 0 until subArr.length()) {
                                 val s = subArr.optJSONObject(i) ?: continue
-                                val file = s.optString("file").ifBlank { continue }
+                                val file = s.optString("file")
+                                if (file.isBlank()) continue
                                 val subUrl = buildProxyUrl(file, proxy, "stream")
                                 synchronized(seenSubs) {
                                     if (seenSubs.add(subUrl)) subs.add(HikariSubtitle(s.optString("label").ifBlank { lang }, subUrl))
@@ -314,7 +317,8 @@ class AniKageProvider : HikariProvider {
         val out = ArrayList<HikariMedia>()
         for (i in 0 until arr.length()) {
             val e = arr.optJSONObject(i) ?: continue
-            val slug = e.optString("slug").ifBlank { continue }
+            val slug = e.optString("slug")
+            if (slug.isBlank()) continue
             val t = e.optJSONObject("title")
             val title = t?.optString("english")?.takeIf { it.isNotBlank() }
                 ?: t?.optString("romaji")?.takeIf { it.isNotBlank() }

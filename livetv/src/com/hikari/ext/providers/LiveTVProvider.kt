@@ -252,7 +252,8 @@ class LiveTVProvider : HikariProvider {
             for (p in providers()) {
                 val type = p.optString("type", "custom")
                 if (type == "custom") continue
-                val link = p.optString("api").ifBlank { continue }
+                val link = p.optString("api")
+                if (link.isBlank()) continue
                 try {
                     val raw = HikariNet.getString(link, mapOf("User-Agent" to DALVIK_UA)) ?: continue
                     val body = LvCrypto.decrypt(raw) ?: raw
@@ -266,7 +267,8 @@ class LiveTVProvider : HikariProvider {
         try {
             for (p in providers()) {
                 if (p.optString("type", "custom") != "custom") continue
-                val link = p.optString("api").ifBlank { continue }
+                val link = p.optString("api")
+                if (link.isBlank()) continue
                 for (e in customChannels(link)) {
                     if (!seen.add(e.slug)) continue
                     out.add(
@@ -468,7 +470,8 @@ class LiveTVProvider : HikariProvider {
             for (i in 0 until arr.length()) {
                 val s = arr.optJSONObject(i) ?: continue
                 val server = s.optString("name").ifBlank { "Server ${i + 1}" }
-                val raw = s.optString("link").ifBlank { continue }
+                val raw = s.optString("link")
+                if (raw.isBlank()) continue
                 val (url, headers) = splitLink(raw)
                 if (!url.startsWith("http")) continue
                 val fixed = url.replace(Regex("(?i)%2f"), "/")
