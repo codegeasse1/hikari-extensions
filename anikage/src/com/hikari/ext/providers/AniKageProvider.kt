@@ -209,15 +209,21 @@ class AniKageProvider : HikariProvider {
 
         val serversBody = HikariNet.getString("${api()}/${enc(slug)}/episodes/${enc(epNum)}/servers", apiHeaders())
             ?: return emptyList()
-        val servers = try {
+        val servers = ArrayList<AkServer>()
+        try {
             val arr = JSONObject(serversBody).optJSONArray("servers") ?: return emptyList()
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val s = arr.optJSONObject(i) ?: continue
+            for (i in 0 until arr.length()) {
+                val s = arr.optJSONObject(i)
+                if (s != null) {
                     val id = s.optString("id")
-                    if (id.isBlank()) continue
-                    val st = s.optJSONArray("subTypes")?.let { a -> buildList { for (j in 0 until a.length()) add(a.optString(j)) } } ?: emptyList()
-                    add(AkServer(id, s.optString("providerId").ifBlank { id }, st))
+                    if (id.isNotBlank()) {
+                        val subArr0 = s.optJSONArray("subTypes")
+                        val st = ArrayList<String>()
+                        if (subArr0 != null) {
+                            for (j in 0 until subArr0.length()) st.add(subArr0.optString(j))
+                        }
+                        servers.add(AkServer(id, s.optString("providerId").ifBlank { id }, st))
+                    }
                 }
             }
         } catch (t: Throwable) { return emptyList() }
@@ -242,19 +248,22 @@ class AniKageProvider : HikariProvider {
                             }
                         }
                         val subType = if (lang == "sub") {
-                            if (root.optJSONArray("subtitles")?.length() ?: 0 > 0) "Softsub" else "Hardsub"
+                            if ((root.optJSONArray("subtitles")?.length() ?: 0) > 0) "Softsub" else "Hardsub"
                         } else "Dub"
                         val baseName = "AniKage ${server.id.replaceFirstChar { it.uppercase() }} $subType".trim()
 
                         val subArr = root.optJSONArray("subtitles")
                         if (subArr != null) {
                             for (i in 0 until subArr.length()) {
-                                val s = subArr.optJSONObject(i) ?: continue
-                                val file = s.optString("file")
-                                if (file.isBlank()) continue
-                                val subUrl = buildProxyUrl(file, proxy, "stream")
-                                synchronized(seenSubs) {
-                                    if (seenSubs.add(subUrl)) subs.add(HikariSubtitle(s.optString("label").ifBlank { lang }, subUrl))
+                                val s = subArr.optJSONObject(i)
+                                if (s != null) {
+                                    val file = s.optString("file")
+                                    if (file.isNotBlank()) {
+                                        val subUrl = buildProxyUrl(file, proxy, "stream")
+                                        synchronized(seenSubs) {
+                                            if (seenSubs.add(subUrl)) subs.add(HikariSubtitle(s.optString("label").ifBlank { lang }, subUrl))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -263,24 +272,26 @@ class AniKageProvider : HikariProvider {
                         val srcArr = root.optJSONArray("sources")
                         if (srcArr != null) {
                             for (i in 0 until srcArr.length()) {
-                                val src = srcArr.optJSONObject(i) ?: continue
-                                val rawUrl = src.optString("url")
-                                val embedUrl = src.optString("embedUrl").takeIf { it.isNotBlank() }
-                                if (embedUrl != null && usedEmbeds.add(embedUrl)) {
-                                    val embedLabel = "AniKage ${src.optString("server").takeIf { it.isNotBlank() } ?: server.id} $subType"
-                                    AkEmbeds.resolveEmbed(embedUrl, "${base()}/", embedLabel, "AniKage", lang, subs::add, links::add)
-                                }
-                                if (rawUrl.isNotBlank()) {
-                                    val isM3u8 = src.optBoolean("isM3U8", false)
-                                    val videoUrl = buildProxyUrl(rawUrl, proxy, if (isM3u8) "m3u8" else "stream")
-                                    val qualityClean = src.optString("quality").trim()
-                                        .replace(Regex("^dub\\s+", RegexOption.IGNORE_CASE), "").takeIf { it.isNotBlank() }
-                                    val serverTag = src.optString("server").takeIf { it.isNotBlank() && it != server.id }
-                                        ?.replaceFirstChar { it.uppercase() }
-                                    val nm = listOfNotNull(baseName, serverTag, qualityClean?.replaceFirstChar { it.uppercase() }).joinToString(" ")
-                                    synchronized(seenLinks) {
-                                        if (seenLinks.add(videoUrl)) {
-                                            links.add(HikariStream(name = nm, url = videoUrl, headers = proxyHeaders(), isM3u8 = isM3u8))
+                                val src = srcArr.optJSONObject(i)
+                                if (src != null) {
+                                    val rawUrl = src.optString("url")
+                                    val embedUrl = src.optString("embedUrl").takeIf { it.isNotBlank() }
+                                    if (embedUrl != null && usedEmbeds.add(embedUrl)) {
+                                        val embedLabel = "AniKage ${src.optString("server").takeIf { it.isNotBlank() } ?: server.id} $subType"
+                                        AkEmbeds.resolveEmbed(embedUrl, "${base()}/", embedLabel, "AniKage", lang, subs::add, links::add)
+                                    }
+                                    if (rawUrl.isNotBlank()) {
+                                        val isM3u8 = src.optBoolean("isM3U8", false)
+                                        val videoUrl = buildProxyUrl(rawUrl, proxy, if (isM3u8) "m3u8" else "stream")
+                                        val qualityClean = src.optString("quality").trim()
+                                            .replace(Regex("^dub\\s+", RegexOption.IGNORE_CASE), "").takeIf { it.isNotBlank() }
+                                        val serverTag = src.optString("server").takeIf { it.isNotBlank() && it != server.id }
+                                            ?.replaceFirstChar { it.uppercase() }
+                                        val nm = listOfNotNull(baseName, serverTag, qualityClean?.replaceFirstChar { it.uppercase() }).joinToString(" ")
+                                        synchronized(seenLinks) {
+                                            if (seenLinks.add(videoUrl)) {
+                                                links.add(HikariStream(name = nm, url = videoUrl, headers = proxyHeaders(), isM3u8 = isM3u8))
+                                            }
                                         }
                                     }
                                 }
@@ -289,11 +300,14 @@ class AniKageProvider : HikariProvider {
                         val embArr = root.optJSONArray("embeds")
                         if (embArr != null) {
                             for (i in 0 until embArr.length()) {
-                                val em = embArr.optJSONObject(i) ?: continue
-                                val embedUrl = em.optString("url").takeIf { it.isNotBlank() } ?: continue
-                                if (!usedEmbeds.add(embedUrl)) continue
-                                val embedLabel = "AniKage ${em.optString("server").takeIf { it.isNotBlank() } ?: server.id} $subType"
-                                AkEmbeds.resolveEmbed(embedUrl, "${base()}/", embedLabel, "AniKage", lang, subs::add, links::add)
+                                val em = embArr.optJSONObject(i)
+                                if (em != null) {
+                                    val embedUrl = em.optString("url").takeIf { it.isNotBlank() }
+                                    if (embedUrl != null && usedEmbeds.add(embedUrl)) {
+                                        val embedLabel = "AniKage ${em.optString("server").takeIf { it.isNotBlank() } ?: server.id} $subType"
+                                        AkEmbeds.resolveEmbed(embedUrl, "${base()}/", embedLabel, "AniKage", lang, subs::add, links::add)
+                                    }
+                                }
                             }
                         }
                     } catch (t: Throwable) { }
