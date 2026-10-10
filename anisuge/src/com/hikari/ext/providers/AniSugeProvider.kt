@@ -80,7 +80,7 @@ class AniSugeProvider : HikariProvider {
         SgApi.refreshDomain()
         val d = SgApi.detail(media.id) ?: return media
         return media.copy(
-            id = d.url,
+            id = d.pageUrl,
             title = d.title,
             posterUrl = d.poster ?: media.posterUrl,
             backdropUrl = d.banner ?: media.backdropUrl,
