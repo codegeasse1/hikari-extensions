@@ -99,10 +99,7 @@ class GoTakuProvider : HikariProvider {
             return listOf(HikariStream(name = "GoTaku $trackLabel", url = "${stream.proxyUrl}/m/0/master.m3u8", isM3u8 = true))
         }
         return qualities.map { (_, _, index) ->
-            val label = when {
-                // height is encoded in the variant name by parseQualities
-                true -> "GoTaku $trackLabel"
-            }
+            val label = "GoTaku $trackLabel"
             HikariStream(name = "$label ${variantLabel(stream.masterPlaylist, index)}", url = "${stream.proxyUrl}/m/$index/master.m3u8", isM3u8 = true)
         }
     }
