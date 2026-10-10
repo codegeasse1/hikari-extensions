@@ -164,7 +164,7 @@ class RareAnimesIndiaProvider : HikariProvider {
         }?.substringAfter(":")?.trim()?.takeIf { it.length > 10 }
             ?: paras.filter { it.length > 120 }.maxByOrNull { it.length }
         val genres = Regex("""<a[^>]+href="[^"]*category[^"]*"[^>]*>([^<]+)</a>""", RegexOption.IGNORE_CASE)
-            .findAll(html).map { unesc(it.groupValues[1]) }.filter { it.isNotBlank() }.distinct().take(8)
+            .findAll(html).map { unesc(it.groupValues[1]) }.filter { it.isNotBlank() }.distinct().take(8).toList()
         return media.copy(
             title = title, posterUrl = poster, backdropUrl = poster,
             overview = plot ?: media.overview, genres = genres.ifEmpty { media.genres },
