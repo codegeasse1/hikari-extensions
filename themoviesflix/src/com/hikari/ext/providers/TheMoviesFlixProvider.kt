@@ -85,7 +85,8 @@ class TheMoviesFlixProvider : HikariProvider {
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         val html = TmfNet.fetchPage(media.id) ?: return media
-        val d = TmfDetail.parse(html, media.id) ?: return mediareturn media.copy(
+        val d = TmfDetail.parse(html, media.id) ?: return media
+        return media.copy(
             title = d.title.ifBlank { media.title },
             type = if (d.isSeries) HikariMediaType.SERIES else HikariMediaType.MOVIE,
             posterUrl = d.poster?.takeIf { it.isNotBlank() } ?: media.posterUrl,
@@ -272,7 +273,7 @@ internal object TmfDetail {
             val img = imgRe.find(block)?.value.orEmpty()
             val titleRaw = titleAttrRe.find(aTag)?.groupValues?.get(1)?.trim().orEmpty()
                 .ifBlank { imgAltRe.find(img)?.groupValues?.get(1)?.trim().orEmpty() }
-                .ifBlank { return@forEach continue }
+            if (titleRaw.isBlank()) continue
             val poster = imgSrcRe.find(img)?.groupValues?.get(1)?.trim().orEmpty().ifBlank { null }
             out.add(TmfCard(href, cleanTitle(titleRaw), poster, looksSeries(titleRaw)))
         }
