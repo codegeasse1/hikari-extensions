@@ -72,15 +72,16 @@ internal class KdSources {
     private suspend fun kdGet(url: String, headers: Map<String, String> = emptyMap()): KdResp? {
         try {
             val r = HikariNet.fetch(url, headers)
-            if (r != null && r.status in 200..299 && r.body != null && !isWalled(r.body)) {
-                return KdResp(r.status, r.body)
+            val body = r?.body
+            if (r != null && r.status in 200..299 && body != null && !isWalled(body)) {
+                return KdResp(r.status, body)
             }
             if (r != null && r.status == 403 || r != null && r.status == 503) {
                 // fall through to the rendered fetch below
-            } else if (r != null && r.status in 200..299 && r.body != null) {
-                return KdResp(r.status, r.body)
+            } else if (r != null && r.status in 200..299 && body != null) {
+                return KdResp(r.status, body)
             } else if (r != null && r.status !in 200..299 && r.status != 403 && r.status != 503) {
-                return KdResp(r.status, r.body.orEmpty())
+                return KdResp(r.status, body.orEmpty())
             }
         } catch (_: Exception) {
         }

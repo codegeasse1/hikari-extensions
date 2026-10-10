@@ -107,9 +107,10 @@ class NetNaijaAppProvider : HikariProvider {
             try {
                 val r = HikariNet.fetch(u, NnAppAuth.headers("GET", u) + extra) ?: continue
                 if (r.status == 401 || r.status == 441) continue
-                if (r.status == 200 && r.body != null) {
+                if (r.status == 200) {
+                    val body = r.body ?: continue
                     mainUrl = host
-                    return r.body
+                    return body
                 }
             } catch (_: Exception) {
             }
