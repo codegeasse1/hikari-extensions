@@ -13,7 +13,7 @@ import android.util.Base64
 /**
  * DoraBash (dorabash.in) — Indian Doraemon / Doraemons / Dorami catalog in
  * Hindi-English, verified live Oct 2026:
- *  - Taxonomy rows: /anime-type/tv|specials|short-movie|movie/ + /genre/*/
+ *  - Taxonomy rows: /anime-type/tv|specials|short-movie|movie/ + /genre-slug/ rows
  *    plus the home "Latest Episodes" watch-card grid.
  *  - Watch pages /watch/<slug>[-episode-N]/ carry server options as
  *    <span data-embed-id="<b64 label>:<b64 url>"> (Abyss = player.abyssplayer.com,
