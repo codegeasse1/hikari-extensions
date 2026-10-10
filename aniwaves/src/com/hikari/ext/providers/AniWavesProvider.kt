@@ -114,12 +114,12 @@ class AniWavesProvider : HikariProvider {
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? {
         AwApi.refreshDomain()
         val d = AwApi.detail(media.id) ?: return null
-        val eps = AwApi.episodes(d.pageUrl, d.animeId)
+        val eps = AwApi.episodes(d.url, d.animeId)
         if (eps.isEmpty()) return null
         val out = ArrayList<HikariEpisode>()
         for (e in eps) {
-            if (e.hasSub) out.add(HikariEpisode(number = e.num, id = "${d.pageUrl}|sub|${d.animeId}|${e.num}|${e.dataIds}", name = e.name ?: "Episode ${e.num}"))
-            if (e.hasDub) out.add(HikariEpisode(number = e.num, id = "${d.pageUrl}|dub|${d.animeId}|${e.num}|${e.dataIds}", name = (e.name ?: "Episode ${e.num}") + " (Dub)"))
+            if (e.hasSub) out.add(HikariEpisode(number = e.num, id = "${d.url}|sub|${d.animeId}|${e.num}|${e.dataIds}", name = e.name ?: "Episode ${e.num}"))
+            if (e.hasDub) out.add(HikariEpisode(number = e.num, id = "${d.url}|dub|${d.animeId}|${e.num}|${e.dataIds}", name = (e.name ?: "Episode ${e.num}") + " (Dub)"))
         }
         return out.ifEmpty { null }
     }
@@ -173,7 +173,7 @@ class AniWavesProvider : HikariProvider {
 
 // ---------------------------------------------------------------------------
 
-private data class AwDetail(val url: String, val title: String, val poster: String?, val background: String?, val plot: String?, val genres: List<String>, val year: Int?, val type: String)
+private data class AwDetail(val url: String, val title: String, val poster: String?, val background: String?, val plot: String?, val genres: List<String>, val year: Int?, val type: String, val animeId: String)
 private data class AwEp(val num: Int, val name: String?, val dataIds: String, val hasSub: Boolean, val hasDub: Boolean)
 
 private object AwApi {
@@ -285,7 +285,7 @@ private object AwApi {
         }
         val animeId = watchMainRe.find(html)?.groupValues?.get(1)
             ?: idSuffixRe.find(url)?.groupValues?.get(1) ?: return null
-        return AwDetail(url, title, poster?.takeIf { it.startsWith("http") }, bg, plot, genres, year, type)
+        return AwDetail(url, title, poster?.takeIf { it.startsWith("http") }, bg, plot, genres, year, type, animeId)
     }
 
     // -- episodes -------------------------------------------------------------------
