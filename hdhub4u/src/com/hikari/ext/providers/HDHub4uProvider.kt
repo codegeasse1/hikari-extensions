@@ -44,7 +44,7 @@ class HDHub4uProvider : HikariProvider {
 
     private fun jh(): Map<String, String> = mapOf("User-Agent" to UA, "Accept" to "application/json")
 
-    private fun tmdb(path: String, query: String): JSONObject? {
+    private suspend fun tmdb(path: String, query: String): JSONObject? {
         val p = if (path.startsWith("/")) path else "/$path"
         HikariNet.getString("$TMDB$p?api_key=$TMDB_KEY&$query", jh())?.let {
             try { return JSONObject(it) } catch (t: Throwable) { }
