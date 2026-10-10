@@ -69,7 +69,7 @@ class MultimoviesProvider : HikariProvider {
         val path = catalog.rawType.ifBlank { catalog.id }
         val url = if (p <= 1) "${MmApi.host()}$path" else "${MmApi.host()}$path&page=$p"
         val html = MmNet.siteGet(url) ?: return emptyList()
-        return MmApi.parseCards(html).mapNotNull { it.toMedia() }
+        return MmApi.parseCards(html).mapNotNull { it.media() }
     }
 
     override suspend fun search(query: String, page: Int): List<HikariMedia> {
@@ -78,7 +78,7 @@ class MultimoviesProvider : HikariProvider {
         if (page > 1) return emptyList()
         MmApi.refreshDomain()
         val html = MmNet.siteGet("${MmApi.host()}/search?q=${MmNet.urlEncode(q)}") ?: return emptyList()
-        return MmApi.parseCards(html).mapNotNull { it.toMedia() }
+        return MmApi.parseCards(html).mapNotNull { it.media() }
     }
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
@@ -272,25 +272,6 @@ internal object MmApi {
             )
         }
         return out
-    }
-
-    private fun MmCard.toMediaType(): HikariMediaType = when {
-        isTv && isAnime -> HikariMediaType.SERIES
-        isTv -> HikariMediaType.SERIES
-        isAnime -> HikariMediaType.MOVIE
-        else -> HikariMediaType.MOVIE
-    }
-
-    fun MmCard.toMedia(): HikariMedia? {
-        if (url.isBlank() || title.isBlank()) return null
-        return HikariMedia(
-            id = url,
-            title = title,
-            type = toMediaType(),
-            posterUrl = poster,
-            year = year,
-            rawType = if (isTv) "tv" else "movie",
-        )
     }
 
     fun isSeries(media: HikariMedia): Boolean =
@@ -527,4 +508,23 @@ internal object MmApi {
             }
         }
     }
+}
+
+private fun MmCard.mediaType(): HikariMediaType = when {
+    isTv && isAnime -> HikariMediaType.SERIES
+    isTv -> HikariMediaType.SERIES
+    isAnime -> HikariMediaType.MOVIE
+    else -> HikariMediaType.MOVIE
+}
+
+private fun MmCard.media(): HikariMedia? {
+    if (url.isBlank() || title.isBlank()) return null
+    return HikariMedia(
+        id = url,
+        title = title,
+        type = mediaType(),
+        posterUrl = poster,
+        year = year,
+        rawType = if (isTv) "tv" else "movie",
+    )
 }
