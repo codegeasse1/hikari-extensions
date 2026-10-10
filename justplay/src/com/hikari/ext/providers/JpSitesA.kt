@@ -470,9 +470,9 @@ internal object Jp4kHub {
                     setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
                 ).find(card)?.groupValues?.get(1)?.let { JpHtml.strip(it) }?.lowercase() ?: ""
             val matched = cards.firstOrNull { c ->
-                val content = contentOf(c)
+                val content = contentOf(c.value)
                 JpNet.titleMatches(content, title) && JpNet.yearMatches(content, res.year)
-            } ?: cards.firstOrNull { c -> JpNet.titleMatches(contentOf(c), title) } ?: return
+            } ?: cards.firstOrNull { c -> JpNet.titleMatches(contentOf(c.value), title) } ?: return
 
             val href = Regex("""href="([^"]+)"""", RegexOption.IGNORE_CASE)
                 .find(matched.value.substringBefore(">"))?.groupValues?.get(1)?.trim()
@@ -498,7 +498,7 @@ internal object Jp4kHub {
                     Regex(
                         """<div[^>]*class="[^"]*episode-links[^"]*"[^>]*>(.*?)</div>""",
                         setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
-                    ).findAll(block).flatMap { JpHtml.anchors(it.groupValues[1]) }
+                    ).findAll(block).flatMap { JpHtml.anchors(it.groupValues[1]) }.toList()
                         .ifEmpty { JpHtml.anchors(block) }
                         .map { it.href.trim() }
                 }

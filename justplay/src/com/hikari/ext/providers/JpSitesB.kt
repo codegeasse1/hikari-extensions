@@ -780,8 +780,9 @@ internal object JpNetNaija {
                                 "&se=${res.season ?: 0}&ep=${res.episode ?: 0}" +
                                 "&detailPath=${JpNet.urlEncode(dubDetailPath)}"
                             val playRes = JpNet.request(
-                                "GET", playUrl, "$site/videoPlayPage/$dubDetailPath",
-                                authHeaders(
+                                "GET", playUrl,
+                                referer = "$site/videoPlayPage/$dubDetailPath",
+                                extraHeaders = authHeaders(
                                     site,
                                     mapOf(
                                         "X-Source" to "webNetnaijaSite",

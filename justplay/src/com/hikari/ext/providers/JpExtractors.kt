@@ -886,7 +886,7 @@ internal object JpGdFlix {
                 """<li[^>]*class="[^"]*list-group-item[^"]*"[^>]*>([^<]*Name[^<]*)</li>""",
                 RegexOption.IGNORE_CASE,
             ).find(html)?.groupValues?.get(1)?.substringAfter("Name :")?.trim()
-                .ifBlank {
+                ?.ifBlank {
                     Regex("""<title>([^<]*)""", RegexOption.IGNORE_CASE).find(html)
                         ?.groupValues?.get(1)?.substringAfter("GDFlix |")?.trim()
                 }.orEmpty()
