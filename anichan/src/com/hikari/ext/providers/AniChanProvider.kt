@@ -486,7 +486,7 @@ private object AcApi {
     private fun hmacKey(): SecretKeySpec {
         val a = Base64.decode(k1, Base64.DEFAULT)
         val b = Base64.decode(k2, Base64.DEFAULT)
-        val x = ByteArray(a.size) { i -> (a[i] xor b[i % b.size]).toByte() }
+        val x = ByteArray(a.size) { i -> (a[i].toInt() xor b[i % b.size].toInt()).toByte() }
         return SecretKeySpec(x, "HmacSHA256")
     }
 
@@ -648,7 +648,7 @@ private object AcApi {
                 for (i in 0 until arr.length()) {
                     val s = arr.optJSONObject(i) ?: continue
                     val t = s.optString("ticket").takeIf { it.isNotBlank() } ?: continue
-                    tickets.add(s.optString("label").takeIf { it.isNotBlank() } ?: s.optString("id").takeIf { it.isNotBlank() } to t)
+                    tickets.add((s.optString("label").takeIf { it.isNotBlank() } ?: s.optString("id").takeIf { it.isNotBlank() }) to t)
                 }
             }
             if (tickets.isEmpty()) {
