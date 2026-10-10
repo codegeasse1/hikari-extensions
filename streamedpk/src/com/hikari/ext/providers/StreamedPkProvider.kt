@@ -48,7 +48,7 @@ class StreamedPkProvider : HikariProvider {
 
     private val jar = ConcurrentHashMap<String, String>()
 
-    private fun apiGet(url: String): String? {
+    private suspend fun apiGet(url: String): String? {
         // hardened client first; raw cookie-jar client as fallback
         return try {
             val h = mutableMapOf(
