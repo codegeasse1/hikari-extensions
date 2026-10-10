@@ -21,6 +21,15 @@ object AkEmbeds {
 
     fun hostOf(url: String): String = try { URL(url).host.lowercase() } catch (t: Throwable) { "" }
 
+    private fun isFlixUrl(url: String): Boolean = hostOf(url).endsWith("flixcloud.cc")
+
+    private val flixUrlRegex = Regex("https?://[^\\s\"'<>\\\\]*flixcloud\\.cc/[^\\s\"'<>\\\\]*")
+
+    private fun flixUrls(html: String): List<String> =
+        flixUrlRegex.findAll(html).map { it.value.trimEnd('.', ',', ';') }
+            .filter { !it.contains("/v7/") && !it.contains("/api/") }
+            .distinct().toList()
+
     suspend fun resolveEmbed(
         embedUrl: String,
         referer: String,
@@ -47,7 +56,7 @@ object AkEmbeds {
                 host.endsWith("otakuhg.site") || host.endsWith("otakuvid.online") || host.endsWith("kwik.cx") ->
                     resolvePackedM3u8(embedUrl, referer, label, subtitleOut, linkOut)
 
-                else -> resolveGeneric(embedUrl, referer, label, subtitleOut, linkOut)
+                else -> resolveGeneric(embedUrl, referer, label, sourceTag, audio, subtitleOut, linkOut)
             }
         } catch (t: Throwable) {
             false
@@ -139,6 +148,8 @@ object AkEmbeds {
         embedUrl: String,
         referer: String,
         label: String,
+        sourceTag: String,
+        audio: String?,
         subtitleOut: (HikariSubtitle) -> Unit,
         linkOut: (HikariStream) -> Unit,
     ): Boolean {
@@ -148,6 +159,10 @@ object AkEmbeds {
             var found = false
             for (h in hits) {
                 if (h.url.isBlank()) continue
+                // Raw FlixCloud masters are XOR-obfuscated and NEVER play directly
+                // (ExoPlayer reports manifest-malformed). Real flix embeds go through
+                // the localhost proxy; never leak the raw URL into the link list.
+                if (isFlixUrl(h.url)) continue
                 linkOut(
                     HikariStream(
                         name = label,
@@ -161,10 +176,16 @@ object AkEmbeds {
             if (found) return true
         } catch (t: Throwable) { }
         val html = fetchEmbedHtml(embedUrl, referer) ?: return false
+        // Wrapper pages that iframe a FlixCloud player: resolve the embed properly
+        // through the localhost proxy instead of leaking the raw master URL.
+        var flixOk = false
+        for (flixEmbed in flixUrls(html)) {
+            if (resolveFlix(flixEmbed, referer, label, sourceTag, audio, subtitleOut, linkOut)) flixOk = true
+        }
         var m3u8 = m3u8Regex.find(html)?.value
         if (m3u8 == null) m3u8 = AkJsPacker.parseAndUnpack(html)?.let { m3u8Regex.find(it)?.value }
-        if (m3u8 == null) return false
-        return emitM3u8(label, m3u8, "https://${hostOf(embedUrl)}/", linkOut)
+        if (m3u8 == null) return flixOk
+        return emitM3u8(label, m3u8, "https://${hostOf(embedUrl)}/", linkOut) || flixOk
     }
 
     private suspend fun fetchEmbedHtml(embedUrl: String, referer: String): String? {
@@ -206,6 +227,8 @@ object AkEmbeds {
     }
 
     private fun emitM3u8(label: String, m3u8: String, referer: String, linkOut: (HikariStream) -> Unit): Boolean {
+        // Never emit raw FlixCloud masters: XOR-obfuscated, unplayable without the proxy.
+        if (isFlixUrl(m3u8)) return false
         linkOut(
             HikariStream(
                 name = label,
