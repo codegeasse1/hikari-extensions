@@ -86,9 +86,11 @@ class M3UPlayerProvider : HikariProvider {
             val line = lines[i]
             if (line.startsWith("#EXTINF")) {
                 val attrs = line.substringAfter("#EXTINF:").substringAfter(",", "")
-                val name = line.substringAfterLast(",").trim()
-                    .ifBlank { Regex("tvg-name=\"([^\"]+)\"").find(attrs)?.groupValues?.get(1)?.trim() }
-                    .ifBlank { null } ?: run { i++; continue }
+                var name = line.substringAfterLast(",").trim()
+                if (name.isBlank()) {
+                    name = Regex("tvg-name=\"([^\"]+)\"").find(attrs)?.groupValues?.get(1)?.trim() ?: ""
+                }
+                if (name.isBlank()) { i++; continue }
                 val logo = Regex("tvg-logo=\"([^\"]+)\"").find(attrs)?.groupValues?.get(1)?.takeIf { it.startsWith("http") }
                 var j = i + 1
                 while (j < lines.size && (lines[j].isBlank() || lines[j].startsWith("#"))) j++
