@@ -1,6 +1,6 @@
 {
   "name": "NetNaija",
-  "version": 1,
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.NetNaijaProvider",
   "tvTypes": ["series", "movie"]
 }

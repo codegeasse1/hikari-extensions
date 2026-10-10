@@ -1,6 +1,0 @@
-{
-  "name": "RaghavAnimeKitsu",
-  "version": 1,
-  "mainClass": "com.hikari.ext.providers.RaghavAnimeKitsuProvider",
-  "tvTypes": ["series", "movie"]
-}

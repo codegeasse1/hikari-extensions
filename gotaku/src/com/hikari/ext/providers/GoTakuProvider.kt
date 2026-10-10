@@ -7,146 +7,191 @@ import com.hikari.ext.HikariMediaType
 import com.hikari.ext.HikariNet
 import com.hikari.ext.HikariProvider
 import com.hikari.ext.HikariStream
-import org.json.JSONObject
-import java.net.URLEncoder
 
 /**
- * GoTaku (gotaku.to) — anime via /api/v1 titles + episode embeds.
- * Ported from KSHITIJ8473/raghav GoTaku to native Hikari.
+ * GoTaku (gotaku.to) — anime via sealed /api/v1 JSON + tokenized CDN proxy.
  *
- *  GET /api/v1/titles?{q,limit,page,sort}  catalog + search
- *  GET /api/v1/titles/{id}                 detail
- *  GET /api/v1/titles/{id}/episodes        episode list (number, label, is_filler)
- *  GET /api/v1/episodes/{epId}/embed?type=hard_sub|dub  -> embed page URL
- * Embed pages carry a manifest token; streams are multi-quality HLS
- * ({proxy}/m/{index}/master.m3u8). Resolution: direct manifest probe first,
- * WebView capture fallback.
+ * Faithful native port: fetchTitles/fetchTitleDetail/fetchEpisodes/fetchEmbed
+ * (AES-GCM-sealed bodies), embed page manifest handshake, GCM playlist +
+ * CTR-masked segments through the localhost GtProxy.
  */
 class GoTakuProvider : HikariProvider {
 
     override val id = "gotaku"
     override val name = "GoTaku"
     override val mainUrl = "https://gotaku.to"
-    override val description = "Anime from GoTaku — trending, latest, movies, sub & dub, multi-quality HLS."
-    override val version = 1
+    override val description = "Anime from GoTaku — trending, recently updated, sub/dub tracks, movies and ONA, direct tokenized streams."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
-    private val browserHeaders = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-        "Accept" to "application/json, text/plain, */*",
-        "Referer" to "$mainUrl/",
-    )
-    private val capture = Regex("""https?://[^"' \s]+\.m3u8[^"' \s]*|https?://[^"' \s]+\.mp4[^"' \s]*""")
-
     override fun catalogs(): List<HikariCatalog> = listOf(
-        HikariCatalog("trending", "Trending", HikariMediaType.SERIES),
-        HikariCatalog("latest", "Latest Updated", HikariMediaType.SERIES),
-        HikariCatalog("top", "Top Rated", HikariMediaType.SERIES),
-        HikariCatalog("movies", "Movies", HikariMediaType.MOVIE),
+        HikariCatalog("trending_day", "Trending Today", HikariMediaType.SERIES),
+        HikariCatalog("trending_week", "Trending This Week", HikariMediaType.SERIES),
+        HikariCatalog("latest", "Recently Updated", HikariMediaType.SERIES),
+        HikariCatalog("track:sub", "Latest Sub", HikariMediaType.SERIES),
+        HikariCatalog("track:dub", "Latest Dub", HikariMediaType.SERIES),
+        HikariCatalog("type:MOVIE", "Anime Movies", HikariMediaType.MOVIE),
+        HikariCatalog("type:ONA", "ONA", HikariMediaType.SERIES),
     )
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
-        val p = page.coerceAtLeast(1)
-        val params = when (catalog.id) {
-            "latest" -> "sort=latest&page=$p&limit=28"
-            "top" -> "sort=score&page=$p&limit=28"
-            "movies" -> "type=movie&page=$p&limit=28"
-            else -> "sort=trending&page=$p&limit=28"
+        GtApi.refreshDomain()
+        val params = mutableMapOf("sort" to "latest", "limit" to "28", "page" to page.coerceAtLeast(1).toString())
+        when {
+            catalog.id == "trending_day" || catalog.id == "trending_week" -> params["sort"] = catalog.id
+            catalog.id.startsWith("track:") -> params["track"] = catalog.id.removePrefix("track:")
+            catalog.id.startsWith("type:") -> params["type"] = catalog.id.removePrefix("type:")
+            else -> if (catalog.id != "latest") return emptyList()
         }
-        return fetchTitles(params)
+        return GtApi.fetchTitles(params).first.mapNotNull { it.toMedia() }
     }
 
     override suspend fun search(query: String, page: Int): List<HikariMedia> {
-        if (query.isBlank() || page > 1) return emptyList()
-        return fetchTitles("q=${URLEncoder.encode(query.trim(), "UTF-8")}&limit=28")
+        if (query.isBlank()) return emptyList()
+        GtApi.refreshDomain()
+        if (page > 1) return emptyList()
+        return GtApi.fetchTitles(mapOf("q" to query.trim(), "limit" to "28")).first.mapNotNull { it.toMedia() }
     }
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
-        val titleId = media.id.substringAfterLast("/").ifBlank { return media }
-        val body = HikariNet.getString("$mainUrl/api/v1/titles/$titleId", browserHeaders) ?: return media
-        return try {
-            val o = JSONObject(body)
-            val d = if (o.has("data")) o.getJSONObject("data") else o
-            val title = d.optString("title").ifBlank { media.title }
-            val poster = d.optString("poster").ifBlank { d.optString("image") }.takeIf { it.startsWith("http") } ?: media.posterUrl
-            val desc = d.optString("synopsis").ifBlank { d.optString("description") }.takeIf { it.isNotBlank() } ?: media.overview
-            media.copy(title = title, posterUrl = poster, backdropUrl = poster, overview = desc)
-        } catch (t: Throwable) { media }
+        GtApi.refreshDomain()
+        val titleId = media.id.substringAfter("title/").substringBefore("?").takeIf { it.isNotBlank() } ?: return media
+        val detail = GtApi.fetchTitleDetail(titleId) ?: return media
+        return media.copy(
+            title = detail.name ?: media.title,
+            posterUrl = detail.poster ?: media.posterUrl,
+            backdropUrl = detail.backdrop ?: media.backdropUrl,
+            overview = detail.synopsis ?: media.overview,
+            genres = if (detail.genres.isNotEmpty()) detail.genres else media.genres,
+            year = detail.year ?: media.year,
+        )
     }
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? {
-        val titleId = media.id.substringAfterLast("/").ifBlank { return null }
-        val body = HikariNet.getString("$mainUrl/api/v1/titles/$titleId/episodes", browserHeaders) ?: return null
-        return try {
-            val o = JSONObject(body)
-            val arr = o.optJSONArray("data") ?: return null
-            val out = ArrayList<HikariEpisode>()
-            for (i in 0 until arr.length()) {
-                val e = arr.optJSONObject(i) ?: continue
-                val epid = e.optString("id").ifBlank { continue }
-                val num = e.optInt("number", 0).takeIf { it > 0 }
-                    ?: e.optString("label").let { Regex("""(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
-                    ?: (i + 1)
-                var name = e.optString("label").takeIf { it.isNotBlank() && !it.equals("Episode $num", true) } ?: "Episode $num"
-                if (e.optBoolean("is_filler", false)) name += " (Filler)"
-                out.add(HikariEpisode(number = num, id = "$titleId|$epid|hard_sub", name = name, image = media.posterUrl))
-                out.add(HikariEpisode(number = num, id = "$titleId|$epid|dub", name = "$name (Dub)", image = media.posterUrl))
-            }
-            out.sortedBy { it.number }.ifEmpty { null }
-        } catch (t: Throwable) { null }
+        GtApi.refreshDomain()
+        val titleId = media.id.substringAfter("title/").substringBefore("?").takeIf { it.isNotBlank() } ?: return null
+        val episodes = GtApi.fetchEpisodes(titleId)
+        if (episodes.isEmpty()) return null
+        val sub = ArrayList<HikariEpisode>()
+        val dub = ArrayList<HikariEpisode>()
+        for (entry in episodes) {
+            val id = entry.id ?: continue
+            val num = entry.number ?: continue
+            val name = episodeDisplayName(entry)
+            if (entry.sub == true) sub.add(HikariEpisode(number = num, id = "$id|hard_sub", name = name, image = entry.thumbnail ?: media.posterUrl))
+            if (entry.dub == true) dub.add(HikariEpisode(number = num, id = "$id|dub", name = "$name (Dub)", image = entry.thumbnail ?: media.posterUrl))
+        }
+        if (sub.isEmpty() && dub.isEmpty()) return null
+        return sub.sortedBy { it.number } + dub.sortedBy { it.number }
     }
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
+        GtApi.refreshDomain()
         val ref = episode?.id ?: return emptyList()
-        val parts = ref.split("|")
-        if (parts.size < 3) return emptyList()
-        val epId = parts[1]
-        val track = parts.getOrNull(2) ?: "hard_sub"
-        val out = ArrayList<HikariStream>()
-        val seen = HashSet<String>()
-        val embedBody = HikariNet.getString("$mainUrl/api/v1/episodes/$epId/embed?type=$track", browserHeaders)
-        val embedUrl = try {
-            if (embedBody == null) null
-            else {
-                val o = JSONObject(embedBody)
-                val d = if (o.has("data")) o.getJSONObject("data") else o
-                d.optString("url").ifBlank { d.optString("embed") }.takeIf { it.isNotBlank() }
+        val episodeId = ref.substringBefore("|").ifBlank { return emptyList() }
+        val track = ref.substringAfter("|", "hard_sub").ifBlank { "hard_sub" }
+        val trackLabel = if (track == "dub") "Dub" else "Hardsub"
+
+        val embedUrl = GtApi.fetchEmbed(episodeId, track) ?: return emptyList()
+        val stream = resolveStream(embedUrl) ?: return emptyList()
+        val qualities = parseQualities(stream.masterPlaylist)
+        if (qualities.isEmpty()) {
+            return listOf(HikariStream(name = "GoTaku $trackLabel", url = "${stream.proxyUrl}/m/0/master.m3u8", isM3u8 = true))
+        }
+        return qualities.map { (_, _, index) ->
+            val label = when {
+                // height is encoded in the variant name by parseQualities
+                true -> "GoTaku $trackLabel"
             }
-        } catch (t: Throwable) { null } ?: return emptyList()
-        val full = if (embedUrl.startsWith("http")) embedUrl else "$mainUrl$embedUrl"
-        // Direct manifest links exposed on the embed page.
-        try {
-            val html = HikariNet.getString(full, browserHeaders + mapOf("Referer" to "$mainUrl/"))
-            if (html != null) {
-                for (m in Regex("""https?://[^"' \s]+/m/\d+/master\.m3u8[^"' \s]*""").findAll(html)) {
-                    if (!seen.add(m.value)) continue
-                    out.add(HikariStream(name = "GoTaku ${if (track == "dub") "Dub" else "Sub"}", url = m.value, isM3u8 = true))
-                }
-                if (out.isNotEmpty()) return out
+            HikariStream(name = "$label ${variantLabel(stream.masterPlaylist, index)}", url = "${stream.proxyUrl}/m/$index/master.m3u8", isM3u8 = true)
+        }
+    }
+
+    private class ResolvedStream(val proxyUrl: String, val masterPlaylist: String)
+
+    private suspend fun resolveStream(embedUrl: String): ResolvedStream? {
+        return try {
+            val site = GtApi.site()
+            val path = if (embedUrl.startsWith("http")) embedUrl else site + embedUrl
+            val html = HikariNet.getString(path, GtApi.browserHeaders + mapOf("Referer" to "$site/"))
+                ?: HikariNet.getStringSmart(path, GtApi.browserHeaders + mapOf("Referer" to "$site/"))
+                ?: return null
+            val base = Regex("data-manifest-base=\"([^\"]+)\"").find(html)?.groupValues?.get(1) ?: return null
+            val stamp = Regex("data-manifest-stamp=\"([^\"]+)\"").find(html)?.groupValues?.get(1) ?: return null
+
+            var master: String? = null
+            var manifest: GtApi.ManifestInfo? = null
+            for (attempt in 0 until 3) {
+                manifest = GtApi.fetchManifest(base, stamp) ?: continue
+                val key = GtCrypto.playlistKey(manifest.keySeed, manifest.token)
+                val masterBytes = HikariNet.getBytes(
+                    manifest.source,
+                    GtApi.browserHeaders + mapOf("Referer" to "$site/", "Origin" to site),
+                ) ?: continue
+                master = GtCrypto.decryptPlaylist(key, masterBytes)
+                if (master != null && master.startsWith("#EXTM3U")) break
+                master = null
             }
-        } catch (t: Throwable) { }
-        for (r in HikariNet.resolveWithWebView(full, capture, timeoutMs = 60_000)) {
-            if (!seen.add(r.url)) continue
-            out.add(HikariStream(name = "GoTaku ${if (track == "dub") "Dub" else "Sub"}", url = r.url, headers = r.headers, isM3u8 = r.url.contains("m3u8")))
+            if (master == null || manifest == null) return null
+            val proxyBase = GtProxy.register(
+                manifestBase = base,
+                stamp = manifest.stamp,
+                token = manifest.token,
+                expiresAt = manifest.expiresAt,
+                keySeed = manifest.keySeed,
+                segmentBytes = manifest.segmentBytes,
+                masterUrl = manifest.source,
+            ) ?: return null
+            ResolvedStream(proxyBase, master)
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    private fun parseQualities(master: String): List<Triple<String, Int, Int>> {
+        val lines = master.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        val out = mutableListOf<Triple<String, Int, Int>>()
+        var index = -1
+        for (line in lines) {
+            if (!line.startsWith("#EXT-X-STREAM-INF")) continue
+            val height = Regex("RESOLUTION=(\\d+)x(\\d+)").find(line)?.groupValues?.get(2)?.toIntOrNull() ?: continue
+            index++
+            val label = when {
+                height >= 2160 -> "2160p"
+                height >= 1080 -> "1080p"
+                height >= 720 -> "720p"
+                height >= 480 -> "480p"
+                height >= 360 -> "360p"
+                else -> "${height}p"
+            }
+            out.add(Triple(label, height, index))
         }
         return out
     }
 
-    private suspend fun fetchTitles(query: String): List<HikariMedia> {
-        val body = HikariNet.getString("$mainUrl/api/v1/titles?$query", browserHeaders) ?: return emptyList()
-        val out = ArrayList<HikariMedia>()
-        try {
-            val o = JSONObject(body)
-            val arr = o.optJSONArray("data") ?: return emptyList()
-            for (i in 0 until arr.length()) {
-                val e = arr.optJSONObject(i) ?: continue
-                val id = e.optString("id").ifBlank { continue }
-                val title = e.optString("title").ifBlank { continue }
-                val poster = e.optString("poster").ifBlank { e.optString("image") }.takeIf { it.startsWith("http") }
-                val format = e.optString("type").ifBlank { e.optString("format") }
-                out.add(HikariMedia(id = "$mainUrl/titles/$id", title = title, type = if (format.contains("movie", true)) HikariMediaType.MOVIE else HikariMediaType.SERIES, posterUrl = poster))
-            }
-        } catch (t: Throwable) { }
-        return out
+    private fun variantLabel(master: String, index: Int): String {
+        return parseQualities(master).firstOrNull { it.third == index }?.first ?: ""
+    }
+
+    private fun episodeDisplayName(entry: GtApi.EpisodeEntry): String {
+        val base = entry.name?.takeIf { it.isNotBlank() }
+            ?: return "Episode ${entry.number ?: entry.label ?: ""}".trim()
+        val label = entry.label ?: return base
+        return if (base != label && !label.matches(Regex("\\d+"))) "$base ($label)" else base
+    }
+
+    private fun GtApi.TitleEntry.toMedia(): HikariMedia? {
+        val name = this.name ?: return null
+        val id = this.id ?: return null
+        return HikariMedia(
+            id = "${GtApi.site()}/title/$id",
+            title = name,
+            type = if (this.format == "MOVIE") HikariMediaType.MOVIE else HikariMediaType.SERIES,
+            posterUrl = this.poster,
+            year = this.year,
+            overview = this.synopsis,
+            genres = this.genres,
+            backdropUrl = this.backdrop,
+        )
     }
 }

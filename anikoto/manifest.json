@@ -1,6 +1,6 @@
 {
   "name": "AniKoto",
-  "version": 1,
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.AniKotoProvider",
   "tvTypes": ["series", "movie"]
 }

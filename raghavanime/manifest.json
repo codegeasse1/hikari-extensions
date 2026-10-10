@@ -1,6 +1,0 @@
-{
-  "name": "RaghavAnime",
-  "version": 1,
-  "mainClass": "com.hikari.ext.providers.RaghavAnimeProvider",
-  "tvTypes": ["series", "movie"]
-}

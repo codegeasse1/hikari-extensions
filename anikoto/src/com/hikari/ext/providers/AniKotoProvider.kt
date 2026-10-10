@@ -27,7 +27,7 @@ class AniKotoProvider : HikariProvider {
     override val name = "AniKoto"
     override val mainUrl = "https://anikototv.to"
     override val description = "Anime from anikototv.to — latest updated, most viewed, ongoing, movies, sub & dub, direct HLS."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
     companion object {
@@ -74,6 +74,8 @@ class AniKotoProvider : HikariProvider {
         HikariCatalog("latest-updated", "Latest Updated", HikariMediaType.SERIES, rawType = "/latest-updated"),
         HikariCatalog("most-viewed", "Most Popular", HikariMediaType.SERIES, rawType = "/most-viewed"),
         HikariCatalog("ongoing", "Ongoing", HikariMediaType.SERIES, rawType = "/status/currently-airing"),
+        HikariCatalog("tv", "TV Series", HikariMediaType.SERIES, rawType = "/type/tv"),
+        HikariCatalog("ova", "OVA / Specials", HikariMediaType.SERIES, rawType = "/type/ova"),
         HikariCatalog("movies", "Movies", HikariMediaType.MOVIE, rawType = "/type/movie")
     )
 
@@ -219,8 +221,20 @@ class AniKotoProvider : HikariProvider {
                 val isMega = host.contains("megaplay", true) || host.contains("vidwish", true) || host.contains("vidtube", true)
                 if (isMega) {
                     val mp = MegaPlay.resolve(embed, referer)
-                    if (mp != null && seen.add(mp.first)) {
-                        out.add(HikariStream(name = "AniKoto $serverName", url = mp.first, headers = mapOf("Referer" to "https://$host/", "User-Agent" to (browserHeaders["User-Agent"] ?: "")), subtitles = mp.second.map { HikariSubtitle(it.first, it.second) }, isM3u8 = true))
+                    if (mp != null) {
+                        val variants = MegaPlay.variants(mp.first, mapOf("Referer" to "https://$host/", "User-Agent" to (browserHeaders["User-Agent"] ?: "")))
+                        val subs = mp.second.map { HikariSubtitle(it.first, it.second) }
+                        if (variants.isEmpty()) {
+                            if (seen.add(mp.first)) {
+                                out.add(HikariStream(name = "AniKoto $serverName", url = mp.first, headers = mapOf("Referer" to "https://$host/", "User-Agent" to (browserHeaders["User-Agent"] ?: "")), subtitles = subs, isM3u8 = true))
+                            }
+                        } else {
+                            for (v in variants) {
+                                if (!seen.add(v.first)) continue
+                                val suffix = v.second?.let { " $it" } ?: ""
+                                out.add(HikariStream(name = "AniKoto $serverName$suffix", url = v.first, headers = mapOf("Referer" to "https://$host/", "User-Agent" to (browserHeaders["User-Agent"] ?: "")), subtitles = subs, isM3u8 = true))
+                            }
+                        }
                     }
                 } else {
                     val hits = try { HikariNet.resolveWithWebView(embed, streamCapture, timeoutMs = 30_000) } catch (_: Throwable) { emptyList() }
@@ -244,13 +258,34 @@ class AniKotoProvider : HikariProvider {
 
     private fun proxyHost(url: String): String {
         var u = url
+        // mirrors serve the same files with permissive headers (full source list)
         val pairs = listOf(
             "vibeplayer.site" to "nanobyte.bigdreamsmalldih.site",
             "vault-01.uwucdn.top" to "uwu1.bigdreamsmalldih.site",
             "vault-02.uwucdn.top" to "uwu2.bigdreamsmalldih.site",
             "vault-03.uwucdn.top" to "uwu3.bigdreamsmalldih.site",
             "vault-04.uwucdn.top" to "uwu4.bigdreamsmalldih.site",
-            "vault-05.uwucdn.top" to "uwu5.bigdreamsmalldih.site"
+            "vault-05.uwucdn.top" to "uwu5.bigdreamsmalldih.site",
+            "vault-06.uwucdn.top" to "uwu6.bigdreamsmalldih.site",
+            "vault-07.uwucdn.top" to "uwu7.bigdreamsmalldih.site",
+            "vault-08.uwucdn.top" to "uwu8.bigdreamsmalldih.site",
+            "vault-09.uwucdn.top" to "uwu9.bigdreamsmalldih.site",
+            "vault-10.uwucdn.top" to "uwu10.bigdreamsmalldih.site",
+            "vault-11.uwucdn.top" to "uwu11.bigdreamsmalldih.site",
+            "vault-12.uwucdn.top" to "uwu12.bigdreamsmalldih.site",
+            "vault-13.uwucdn.top" to "uwu13.bigdreamsmalldih.site",
+            "vault-14.uwucdn.top" to "uwu14.bigdreamsmalldih.site",
+            "vault-15.uwucdn.top" to "uwu15.bigdreamsmalldih.site",
+            "vault-16.uwucdn.top" to "uwu16.bigdreamsmalldih.site",
+            "vault-99.uwucdn.top" to "uwu17.bigdreamsmalldih.site",
+            "vault-10.owocdn.top" to "10.bigdreamsmalldih.site",
+            "vault-11.owocdn.top" to "11.bigdreamsmalldih.site",
+            "vault-12.owocdn.top" to "12.bigdreamsmalldih.site",
+            "vault-13.owocdn.top" to "13.bigdreamsmalldih.site",
+            "vault-14.owocdn.top" to "14.bigdreamsmalldih.site",
+            "vault-15.owocdn.top" to "15.bigdreamsmalldih.site",
+            "vault-16.owocdn.top" to "16.bigdreamsmalldih.site",
+            "vault-99.owocdn.top" to "99.bigdreamsmalldih.site"
         )
         for ((a, b) in pairs) u = u.replace(a, b)
         return u
@@ -407,5 +442,29 @@ private object MegaPlay {
             val tok = "${b64u(payload.toByteArray(Charsets.UTF_8))}.${b64u(sig)}"
             url + (if (url.contains("?")) "&" else "?") + "token=$tok"
         } catch (_: Exception) { url }
+    }
+
+    suspend fun variants(m3u8: String, headers: Map<String, String>): List<Pair<String, Int?>> {
+        val text = HikariNet.getString(signUrl(m3u8), headers) ?: return emptyList()
+        if (!text.contains("#EXTM3U")) return emptyList()
+        val base = m3u8.substringBefore('?').substringBeforeLast('/') + "/"
+        val out = ArrayList<Pair<String, Int?>>()
+        val lines = text.lines()
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i].trim()
+            if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                val q = Regex("""RESOLUTION=(\d+)x(\d+)""").find(line)?.groupValues?.get(2)?.toIntOrNull()
+                var j = i + 1
+                while (j < lines.size && (lines[j].isBlank() || lines[j].startsWith("#"))) j++
+                if (j < lines.size) {
+                    val uri = lines[j].trim()
+                    if (uri.isNotEmpty()) out.add((if (uri.startsWith("http")) uri else base + uri) to q)
+                    i = j
+                }
+            }
+            i++
+        }
+        return out.map { (u, q) -> signUrl(u) to q }
     }
 }

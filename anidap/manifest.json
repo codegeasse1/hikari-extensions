@@ -1,6 +1,6 @@
 {
   "name": "Anidap",
-  "version": 1,
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.AnidapProvider",
   "tvTypes": ["series", "movie"]
 }

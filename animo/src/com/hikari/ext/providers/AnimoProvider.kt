@@ -24,18 +24,33 @@ class AnimoProvider : HikariProvider {
     override val name = "Animo"
     override val mainUrl = "https://4animo.xyz"
     override val description = "Anime from 4animo.xyz — trending, recently updated, movies, TV, OVA/ONA, sub & dub, direct HLS."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.SERIES, HikariMediaType.MOVIE)
 
     private val apiUrl = "https://api.kryzox.xyz"
     private val cdnUrl = "https://cdn.4animo.xyz"
     private val ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
-    private val apiHeaders = mapOf(
+
+    @Volatile private var site = "https://4animo.xyz"
+    @Volatile private var lastDomainFetch = 0L
+
+    private suspend fun refreshDomain() {
+        val now = System.currentTimeMillis()
+        if (now - lastDomainFetch < 5 * 60 * 1000L) return
+        lastDomainFetch = now
+        try {
+            val txt = HikariNet.getString("https://cloudstreampluginhelper-default-rtdb.firebaseio.com/.json") ?: return
+            val v = JSONObject(txt).optString("animo").ifBlank { JSONObject(txt).optString("animo_url") }.trim().removeSuffix("/")
+            if (v.startsWith("http")) site = v
+        } catch (t: Throwable) { }
+    }
+
+    private fun apiHeaders(): Map<String, String> = mapOf(
         "User-Agent" to ua,
         "Accept" to "application/json, text/plain, */*",
         "Accept-Language" to "en-US,en;q=0.5",
-        "Referer" to "$mainUrl/",
-        "Origin" to mainUrl
+        "Referer" to "$site/",
+        "Origin" to site
     )
 
     private val rows = listOf(
@@ -52,26 +67,32 @@ class AnimoProvider : HikariProvider {
     )
 
     override fun catalogs(): List<HikariCatalog> =
-        rows.map { (k, label) -> HikariCatalog(k, label, HikariMediaType.SERIES, rawType = k) }
+        rows.map { (k, label) ->
+            val t = if (k == "movie") HikariMediaType.MOVIE else HikariMediaType.SERIES
+            HikariCatalog(k, label, t, rawType = k)
+        }
 
     override suspend fun getCatalog(catalog: HikariCatalog, page: Int): List<HikariMedia> {
+        refreshDomain()
         val key = catalog.rawType.ifBlank { catalog.id }
         val url = "$apiUrl/anime/$key?page=$page&limit=20"
-        val txt = HikariNet.getString(url, apiHeaders) ?: return emptyList()
+        val txt = HikariNet.getStringSmart(url, apiHeaders()) ?: return emptyList()
         return parseAnimeList(txt).mapNotNull { it.toMedia() }
     }
 
     override suspend fun search(query: String, page: Int): List<HikariMedia> {
         if (query.isBlank()) return emptyList()
         if (page > 1) return emptyList()
+        refreshDomain()
         val enc = URLEncoder.encode(query.trim(), "UTF-8")
-        val txt = HikariNet.getString("$apiUrl/anime/search?keyword=$enc&page=1&limit=20", apiHeaders) ?: return emptyList()
+        val txt = HikariNet.getStringSmart("$apiUrl/anime/search?keyword=$enc&page=1&limit=20", apiHeaders()) ?: return emptyList()
         return parseAnimeList(txt).mapNotNull { it.toMedia() }
     }
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         val animeId = media.id.substringAfterLast("/").substringBefore("?").toIntOrNull() ?: return media
-        val txt = HikariNet.getString("$apiUrl/anime/$animeId", apiHeaders) ?: return media
+        refreshDomain()
+        val txt = HikariNet.getStringSmart("$apiUrl/anime/$animeId", apiHeaders()) ?: return media
         val obj = runCatching { JSONObject(txt) }.getOrNull() ?: return media
         val titles = obj.optJSONObject("titles")
         val title = titles?.optString("english")?.takeIf { it.isNotBlank() }
@@ -90,7 +111,8 @@ class AnimoProvider : HikariProvider {
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? {
         val animeId = media.id.substringAfterLast("/").substringBefore("?").toIntOrNull() ?: return null
-        val txt = HikariNet.getString("$apiUrl/anime/$animeId/episodes", apiHeaders) ?: return null
+        refreshDomain()
+        val txt = HikariNet.getStringSmart("$apiUrl/anime/$animeId/episodes", apiHeaders()) ?: return null
         val arr = runCatching { JSONObject(txt).optJSONArray("data") } .getOrNull() ?: return null
         val out = ArrayList<HikariEpisode>()
         for (i in 0 until arr.length()) {
