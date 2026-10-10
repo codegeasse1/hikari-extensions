@@ -1,0 +1,6 @@
+{
+  "name": "AnimeSalt",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimeSaltProvider",
+  "tvTypes": ["series", "movie"]
+}

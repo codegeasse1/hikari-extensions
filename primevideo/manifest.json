@@ -1,0 +1,6 @@
+{
+  "name": "PrimeVideo",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.PrimeVideoProvider",
+  "tvTypes": ["series", "movie"]
+}

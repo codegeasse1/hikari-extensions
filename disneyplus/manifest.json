@@ -1,0 +1,6 @@
+{
+  "name": "DisneyPlus",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.DisneyPlusProvider",
+  "tvTypes": ["series", "movie"]
+}
