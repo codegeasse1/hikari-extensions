@@ -31,7 +31,7 @@ class DesiSerialsProvider : HikariProvider {
     override val name = "Desi Serials"
     override val mainUrl = "https://www.desiserials.su"
     override val description = "Indian TV serial episodes — Star Plus, Colors TV, Zee TV, Sony, SAB and more."
-    override val version = 3
+    override val version = 4
     override val tvTypes = setOf(HikariMediaType.SERIES)
 
     private val ua =
@@ -210,10 +210,24 @@ class DesiSerialsProvider : HikariProvider {
     // ---------------- streams ----------------
 
     private val m3u8Url = Regex("""https?://[^\s"'<>]+\.m3u8(?:[?#][^\s"'<>]*)?""")
+    private val mpdUrl = Regex("""https?://[^\s"'<>]+\.mpd(?:[?#][^\s"'<>]*)?""")
+    private val masterTxtUrl = Regex("""https?://[^\s"'<>]*master\.txt(?:[?#][^\s"'<>]*)?""")
     private val mp4Url = Regex("""https?://[^\s"'<>]+\.mp4(?:[?#][^\s"'<>]*)?""")
+    private val mkvUrl = Regex("""https?://[^\s"'<>]+\.mkv(?:[?#][^\s"'<>]*)?""")
+    // player-config sources: file:"...", src:'...', jwplayer setup blocks, etc.
+    private val jsFileSrc = Regex("""(?i)(?:file|src|source)\s*[:=]\s*["'](https?://[^"']+)["']""")
     private val frameSrc = Regex("""<iframe[^>]+src="([^"]+)"""")
-    private val capture = Regex("""(?i)\.m3u8(?:\?|$)|[^a-z]master\.txt|\.mp4(?:\?|$)""")
+    // network capture: HLS + DASH (.mpd — Shaka and friends) + progressive.
+    // v3 only watched for m3u8/mp4, so DASH manifests slipped through unseen.
+    private val capture = Regex("""(?i)(\.m3u8|\.mpd|master\.txt|\.mp4|\.mkv)(?:[?#]|$)""")
 
+    private fun flagsOf(url: String): Pair<Boolean, Boolean> {
+        val l = url.lowercase()
+        return (l.contains("m3u8") || l.contains("master.txt")) to l.contains(".mpd")
+    }
+
+    // Runs on a player page loaded DIRECTLY (no navigation after injection),
+    // so the click loop below survives for the whole resolver timeout.
     private val hookScript = """
         (function() {
             if (window.__interceptor_installed) return "already_installed";
@@ -223,7 +237,7 @@ class DesiSerialsProvider : HikariProvider {
             function triggerInterception(url) {
                 if (!url) return;
                 var urlStr = (url && typeof url.toString === 'function') ? url.toString() : url;
-                if (urlStr.indexOf('m3u8') !== -1 || urlStr.indexOf('master.txt') !== -1 || urlStr.indexOf('.mp4') !== -1) {
+                if (urlStr.indexOf('m3u8') !== -1 || urlStr.indexOf('master.txt') !== -1 || urlStr.indexOf('.mpd') !== -1 || urlStr.indexOf('.mp4') !== -1) {
                     window.location.href = urlStr;
                 }
             }
@@ -247,6 +261,27 @@ class DesiSerialsProvider : HikariProvider {
                     });
                 }
             } catch(e) {}
+            // many players only request the manifest after a play gesture
+            function tryPlay() {
+                try {
+                    var sels = ['.vjs-big-play-button', '.jw-icon-display', '.jw-display-icon-display', '.plyr__control--overlaid', 'button.vds-play-button', '.shaka-play-button', '.play-btn', '#playBtn', '[data-play]', '.hjs-play'];
+                    for (var i = 0; i < sels.length; i++) {
+                        var el = document.querySelector(sels[i]);
+                        if (el) { try { el.click(); } catch(x) {} }
+                    }
+                    var vids = document.querySelectorAll('video');
+                    for (var j = 0; j < vids.length; j++) {
+                        try {
+                            if (vids[j].paused) {
+                                var p = vids[j].play();
+                                if (p && p.catch) { p.catch(function() {}); }
+                            }
+                        } catch(x) {}
+                    }
+                } catch(e) {}
+            }
+            try { setInterval(tryPlay, 2000); } catch(e) {}
+            try { tryPlay(); } catch(e) {}
         })();
     """.trimIndent()
 
@@ -272,20 +307,37 @@ class DesiSerialsProvider : HikariProvider {
         return out
     }
 
-    private fun playHeaders(episodeUrl: String): Map<String, String> = mapOf(
+    private fun gateOrigin(url: String): String = try {
+        val u = java.net.URI(url)
+        "${u.scheme}://${u.host}"
+    } catch (_: Throwable) {
+        "https://go.searchping.com"
+    }
+
+    // Media headers: the manifest/segment requests the player page itself
+    // fires carry the PLAYER page as Referer (not the episode page), so the
+    // fallback mirrors that. Whenever the WebView hands us real request
+    // headers we prefer those instead.
+    private fun playHeaders(referer: String): Map<String, String> = mapOf(
         "User-Agent" to ua,
-        "Referer" to episodeUrl,
-        "Origin" to mainUrl,
+        "Referer" to referer,
+        "Origin" to gateOrigin(referer),
         "Accept" to "*/*",
     )
 
-    private fun navScript(serverUrl: String): String {
+    private fun contextScript(serverUrl: String): String {
         // The resolver gate (go.searchping.com) only answers navigations that
         // carry this episode page as Referer — a cold WebView load gets
-        // "Access denied". So the WebView opens the EPISODE page first and
-        // navigates from there: the request then carries the right Referer
-        // plus the site's cookies, the gate redirects into the file-host
-        // player, and the capture sees the playlist it requests.
+        // "Access denied", and the script context is wiped by any navigation,
+        // so this does BOTH, in order:
+        //  1. iframe: embeds the server link inside the episode page. The
+        //     iframe request carries the episode Referer + site cookies, the
+        //     gate serves the real player into it, and the WebView's network
+        //     interceptor sees the manifest it requests — all while this
+        //     script keeps running in the main frame.
+        //  2. backup nav: halfway through the timeout, loads the server link
+        //     in the main frame too (still carrying this episode as Referer)
+        //     in case the gate refuses framed playback.
         val target = JSONObject.quote(serverUrl)
         return """
             (function() {
@@ -293,7 +345,7 @@ class DesiSerialsProvider : HikariProvider {
                     function trigger(u) {
                         if (!u) return;
                         var s = (u && u.toString) ? u.toString() : u;
-                        if (s.indexOf('m3u8') !== -1 || s.indexOf('master.txt') !== -1 || s.indexOf('.mp4') !== -1) {
+                        if (s.indexOf('m3u8') !== -1 || s.indexOf('master.txt') !== -1 || s.indexOf('.mpd') !== -1 || s.indexOf('.mp4') !== -1) {
                             window.location.href = s;
                         }
                     }
@@ -319,10 +371,55 @@ class DesiSerialsProvider : HikariProvider {
                     } catch(e) {}
                 }
                 try { hook(); } catch(e) {}
-                try { window.addEventListener('load', function() { try { hook(); } catch(e) {} }); } catch(e) {}
-                setTimeout(function() { try { window.location.href = $target; } catch(e) {} }, 1200);
+                try {
+                    var f = document.createElement('iframe');
+                    f.src = $target;
+                    f.setAttribute('allowfullscreen', '');
+                    f.style.position = 'fixed';
+                    f.style.width = '100%';
+                    f.style.height = '100%';
+                    f.style.top = '0';
+                    f.style.left = '0';
+                    document.body.appendChild(f);
+                } catch(e) {}
+                setTimeout(function() { try { window.location.href = $target; } catch(e) {} }, 25000);
             })();
         """.trimIndent()
+    }
+
+    private fun emitDirect(
+        url: String,
+        label: String,
+        referer: String,
+        headers: Map<String, String>?,
+        out: MutableList<HikariStream>,
+        seen: MutableSet<String>,
+    ): Boolean {
+        synchronized(seen) {
+            if (!seen.add(url)) return true
+            val (hls, mpd) = flagsOf(url)
+            out.add(
+                HikariStream(
+                    name = label, url = url,
+                    headers = if (!headers.isNullOrEmpty()) headers else playHeaders(referer),
+                    isM3u8 = hls, isMpd = mpd,
+                ),
+            )
+            return true
+        }
+    }
+
+    private fun findDirectInHtml(body: String): String? {
+        return m3u8Url.find(body)?.value
+            ?: mpdUrl.find(body)?.value
+            ?: masterTxtUrl.find(body)?.value
+            ?: mp4Url.find(body)?.value
+            ?: mkvUrl.find(body)?.value
+            ?: jsFileSrc.findAll(body).firstOrNull {
+                val u = it.groupValues[1].lowercase()
+                u.contains(".m3u8") || u.contains(".mpd") || u.contains(".mp4") ||
+                    u.contains(".mkv") || u.contains("master.txt")
+            }?.groupValues?.get(1)
     }
 
     private suspend fun resolveServer(
@@ -333,55 +430,40 @@ class DesiSerialsProvider : HikariProvider {
     ) {
         val tag = "[${server.name}]"
         // Tier 1: hardened HTTP with episode Referer — getlink may hand back a
-        // player page carrying a direct file, or an inner embed URL.
+        // player page carrying a direct file (HLS or DASH), a player-config
+        // file:"..." source, or an inner embed URL.
         try {
             val body = HikariNet.getString(server.url, pageHeaders(episodeUrl))
-            if (!body.isNullOrBlank()) {
-                val direct = m3u8Url.find(body)?.value ?: mp4Url.find(body)?.value
+            if (!body.isNullOrBlank() && !body.contains("Access denied")) {
+                val direct = findDirectInHtml(body)
                 if (direct != null) {
-                    val h = playHeaders(episodeUrl)
-                    synchronized(seen) {
-                        if (seen.add(direct)) {
-                            out.add(
-                                HikariStream(
-                                    name = "$tag Direct", url = direct, headers = h,
-                                    isM3u8 = direct.contains("m3u8"),
-                                ),
-                            )
-                        }
-                    }
+                    emitDirect(direct, "$tag Direct", server.url, null, out, seen)
                     return
                 }
                 val frame = frameSrc.find(body)?.groupValues?.get(1)
                 if (!frame.isNullOrBlank()) {
                     val embed = if (frame.startsWith("//")) "https:$frame" else frame
+                    val before = synchronized(seen) { out.size }
                     resolveEmbed(embed, server.name, episodeUrl, out, seen)
-                    return
+                    val after = synchronized(seen) { out.size }
+                    if (after > before) return
+                    // embed attempt yielded nothing — fall through to tier 2
+                    // instead of giving up on this server.
                 }
             }
         } catch (t: Throwable) {
         }
-        // Tier 2: episode-context WebView — opens the episode page, then
-        // navigates to the server link from inside it so the gate sees the
-        // episode Referer + cookies and redirects into the real player.
+        // Tier 2: episode-context WebView — opens the episode page, embeds the
+        // server link in an iframe from inside it (episode Referer + cookies),
+        // then loads it in the main frame as backup. Capture watches for HLS,
+        // DASH, and progressive requests from either.
         try {
             val results = HikariNet.resolveWithWebView(
-                episodeUrl, capture, timeoutMs = 60_000, script = navScript(server.url),
+                episodeUrl, capture, timeoutMs = 50_000, script = contextScript(server.url),
             )
             var got = false
             for (r in results) {
-                val h = if (r.headers.isNotEmpty()) r.headers else playHeaders(episodeUrl)
-                synchronized(seen) {
-                    if (seen.add(r.url)) {
-                        out.add(
-                            HikariStream(
-                                name = "$tag ${server.name}", url = r.url, headers = h,
-                                isM3u8 = r.url.contains("m3u8", true) || r.url.contains("master.txt", true),
-                            ),
-                        )
-                        got = true
-                    }
-                }
+                if (emitDirect(r.url, "$tag ${server.name}", server.url, r.headers, out, seen)) got = true
             }
             if (got) return
         } catch (t: Throwable) {
@@ -402,22 +484,26 @@ class DesiSerialsProvider : HikariProvider {
         out: MutableList<HikariStream>,
         seen: MutableSet<String>,
     ) {
+        // Direct load is fine here: inner embeds are file hosts, not the
+        // Referer-gated resolver. The click loop in hookScript survives
+        // because this page is never navigated away from.
+        try {
+            val body = HikariNet.getString(embed, pageHeaders(episodeUrl))
+            if (!body.isNullOrBlank()) {
+                val direct = findDirectInHtml(body)
+                if (direct != null) {
+                    emitDirect(direct, "[$serverName] Embed", embed, null, out, seen)
+                    return
+                }
+            }
+        } catch (t: Throwable) {
+        }
         try {
             val results = HikariNet.resolveWithWebView(
                 embed, capture, timeoutMs = 45_000, script = hookScript,
             )
             for (r in results) {
-                val h = if (r.headers.isNotEmpty()) r.headers else playHeaders(episodeUrl)
-                synchronized(seen) {
-                    if (seen.add(r.url)) {
-                        out.add(
-                            HikariStream(
-                                name = "[$serverName] Embed", url = r.url, headers = h,
-                                isM3u8 = r.url.contains("m3u8", true) || r.url.contains("master.txt", true),
-                            ),
-                        )
-                    }
-                }
+                emitDirect(r.url, "[$serverName] Embed", embed, r.headers, out, seen)
             }
         } catch (t: Throwable) {
         }
