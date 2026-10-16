@@ -31,7 +31,7 @@ class DesiSerialsProvider : HikariProvider {
     override val name = "Desi Serials"
     override val mainUrl = "https://www.desiserials.su"
     override val description = "Indian TV serial episodes — Star Plus, Colors TV, Zee TV, Sony, SAB and more."
-    override val version = 2
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.SERIES)
 
     private val ua =
@@ -154,11 +154,15 @@ class DesiSerialsProvider : HikariProvider {
     private suspend fun fetchHtml(url: String): String? {
         return try {
             HikariNet.getStringSmart(url, pageHeaders())
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
             null
         } ?: try {
             HikariNet.getString(url, pageHeaders())
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
+            null
+        } ?: try {
+            HikariNet.getStringRendered(url)
+        } catch (t: Throwable) {
             null
         }
     }
@@ -193,7 +197,7 @@ class DesiSerialsProvider : HikariProvider {
                 posterUrl = img?.let { absUrl(it) } ?: poster ?: media.posterUrl,
                 title = if (title.isNotBlank()) title else media.title,
             )
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
             media
         }
     }
@@ -355,7 +359,7 @@ class DesiSerialsProvider : HikariProvider {
                     return
                 }
             }
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
         }
         // Tier 2: episode-context WebView — opens the episode page, then
         // navigates to the server link from inside it so the gate sees the
@@ -380,7 +384,7 @@ class DesiSerialsProvider : HikariProvider {
                 }
             }
             if (got) return
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
         }
         // Tier 3: external fallback — opens the server link in the browser so
         // the episode is never left with zero playable entries.
@@ -415,7 +419,7 @@ class DesiSerialsProvider : HikariProvider {
                     }
                 }
             }
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
         }
     }
 
@@ -434,6 +438,7 @@ class DesiSerialsProvider : HikariProvider {
                     sem.acquire()
                     try {
                         resolveServer(server, episodeUrl, out, seen)
+                    } catch (t: Throwable) {
                     } finally {
                         sem.release()
                     }
@@ -441,7 +446,7 @@ class DesiSerialsProvider : HikariProvider {
             }.forEach {
                 try {
                     it.await()
-                } catch (_: Exception) {
+                } catch (t: Throwable) {
                 }
             }
         }
