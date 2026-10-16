@@ -10,6 +10,7 @@ import com.hikari.ext.HikariStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.Semaphore
 
@@ -30,7 +31,7 @@ class DesiSerialsProvider : HikariProvider {
     override val name = "Desi Serials"
     override val mainUrl = "https://www.desiserials.su"
     override val description = "Indian TV serial episodes — Star Plus, Colors TV, Zee TV, Sony, SAB and more."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.SERIES)
 
     private val ua =
@@ -274,6 +275,52 @@ class DesiSerialsProvider : HikariProvider {
         "Accept" to "*/*",
     )
 
+    private fun navScript(serverUrl: String): String {
+        // The resolver gate (go.searchping.com) only answers navigations that
+        // carry this episode page as Referer — a cold WebView load gets
+        // "Access denied". So the WebView opens the EPISODE page first and
+        // navigates from there: the request then carries the right Referer
+        // plus the site's cookies, the gate redirects into the file-host
+        // player, and the capture sees the playlist it requests.
+        val target = JSONObject.quote(serverUrl)
+        return """
+            (function() {
+                function hook() {
+                    function trigger(u) {
+                        if (!u) return;
+                        var s = (u && u.toString) ? u.toString() : u;
+                        if (s.indexOf('m3u8') !== -1 || s.indexOf('master.txt') !== -1 || s.indexOf('.mp4') !== -1) {
+                            window.location.href = s;
+                        }
+                    }
+                    try {
+                        var d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+                        if (d && d.set) {
+                            var o = d.set;
+                            Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+                                set: function(v) { trigger(v); return o.apply(this, arguments); },
+                                configurable: true, enumerable: true
+                            });
+                        }
+                    } catch(e) {}
+                    try {
+                        var d2 = Object.getOwnPropertyDescriptor(HTMLSourceElement.prototype, 'src');
+                        if (d2 && d2.set) {
+                            var o2 = d2.set;
+                            Object.defineProperty(HTMLSourceElement.prototype, 'src', {
+                                set: function(v) { trigger(v); return o2.apply(this, arguments); },
+                                configurable: true, enumerable: true
+                            });
+                        }
+                    } catch(e) {}
+                }
+                try { hook(); } catch(e) {}
+                try { window.addEventListener('load', function() { try { hook(); } catch(e) {} }); } catch(e) {}
+                setTimeout(function() { try { window.location.href = $target; } catch(e) {} }, 1200);
+            })();
+        """.trimIndent()
+    }
+
     private suspend fun resolveServer(
         server: Server,
         episodeUrl: String,
@@ -305,21 +352,17 @@ class DesiSerialsProvider : HikariProvider {
                 if (!frame.isNullOrBlank()) {
                     val embed = if (frame.startsWith("//")) "https:$frame" else frame
                     resolveEmbed(embed, server.name, episodeUrl, out, seen)
-                    synchronized(seen) {
-                        if (out.none { it.name.startsWith(tag) }) {
-                            out.add(HikariStream(name = "$tag Embed", url = "", externalUrl = true))
-                        }
-                    }
                     return
                 }
             }
         } catch (_: Exception) {
         }
-        // Tier 2: full WebView — follows the getlink redirect chain into the
-        // file-host player and captures the playlist it requests.
+        // Tier 2: episode-context WebView — opens the episode page, then
+        // navigates to the server link from inside it so the gate sees the
+        // episode Referer + cookies and redirects into the real player.
         try {
             val results = HikariNet.resolveWithWebView(
-                server.url, capture, timeoutMs = 45_000, script = hookScript,
+                episodeUrl, capture, timeoutMs = 60_000, script = navScript(server.url),
             )
             var got = false
             for (r in results) {
