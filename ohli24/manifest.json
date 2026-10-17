@@ -1,0 +1,6 @@
+{
+  "name": "OHLI24",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.Ohli24Provider",
+  "tvTypes": ["series", "movie"]
+}

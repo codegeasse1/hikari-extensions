@@ -1,0 +1,6 @@
+{
+  "name": "M3U Player",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.M3UPlayerProvider",
+  "tvTypes": ["series", "movie"]
+}

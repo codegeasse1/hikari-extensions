@@ -1,0 +1,6 @@
+{
+  "name": "Xanime",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.XanimeProvider",
+  "tvTypes": ["series", "movie"]
+}

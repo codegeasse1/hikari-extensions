@@ -1,0 +1,6 @@
+{
+  "name": "Hotstar",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.HotstarProvider",
+  "tvTypes": ["series", "movie"]
+}

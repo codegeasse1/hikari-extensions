@@ -1,0 +1,6 @@
+{
+  "name": "TheMoviesFlix",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.TheMoviesFlixProvider",
+  "tvTypes": ["series", "movie"]
+}

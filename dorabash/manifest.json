@@ -1,0 +1,6 @@
+{
+  "name": "DoraBash",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.DoraBashProvider",
+  "tvTypes": ["series", "movie"]
+}

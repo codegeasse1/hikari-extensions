@@ -1,0 +1,6 @@
+{
+  "name": "PimpBunny",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.PimpbunnyProvider",
+  "tvTypes": ["movie"]
+}

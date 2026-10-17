@@ -1,0 +1,6 @@
+{
+  "name": "AniKage",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AniKageProvider",
+  "tvTypes": ["series", "movie"]
+}

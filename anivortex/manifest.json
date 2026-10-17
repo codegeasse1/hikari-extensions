@@ -1,0 +1,6 @@
+{
+  "name": "AniVortex",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AniVortexProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "AniPM",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.AniPMProvider",
+  "tvTypes": ["series", "movie"]
+}

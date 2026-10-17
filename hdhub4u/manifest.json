@@ -1,0 +1,6 @@
+{
+  "name": "HDHub4u",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.HDHub4uProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "AnimeInWeb",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.AnimeInWebProvider",
+  "tvTypes": [
+    "series",
+    "movie"
+  ]
+}

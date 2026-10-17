@@ -1,0 +1,6 @@
+{
+  "name": "LatAnime",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.LatAnimeProvider",
+  "tvTypes": ["series", "movie"]
+}
