@@ -24,7 +24,7 @@ import javax.crypto.spec.SecretKeySpec
  *  - search:            `https://mrds.com/search/<query>/`  → `.../<n>/`
  *  - a post page (`/archives/<id>/`) embeds a DPlayer whose `data-config`
  *    JSON holds the signed `hls.dscxru.cn/...m3u8` stream.
- *  - post images live on `pic.gyezpb.cn` AES-encrypted (key/iv baked into
+ *  - post images live on rotating `pic.*.cn` hosts, AES-encrypted (key/iv baked into
  *    the page) and must be decrypted to render.
  *
  * getCatalog/search take a page argument, so the app's own pagination is
@@ -36,7 +36,7 @@ class MrdsProvider : HikariProvider {
     override val name = "MRDS"
     override val mainUrl = "https://mrds.com"
     override val description = "Daily contest & gossip videos from mrds.com — 21 category walls plus search, direct HLS streams."
-    override val version = 3
+    override val version = 4
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -50,6 +50,9 @@ class MrdsProvider : HikariProvider {
         private val translateMutex = Mutex()
         private const val IMG_KEY = "f5d965df75336270"
         private const val IMG_IV = "97b60394abc2fbe1"
+        /** Image CDN rotates often (wxxrrip, gyezpb, jtzatly...): match any
+         *  pic.* host so posters keep decrypting after a rotation. */
+        private val PIC_HOST = Regex("""https?://pic\.[a-z0-9.-]+\.[a-z]+""", RegexOption.IGNORE_CASE)
     }
 
     override fun catalogs(): List<HikariCatalog> = listOf(
@@ -105,7 +108,7 @@ class MrdsProvider : HikariProvider {
             poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(page)?.groupValues?.get(1)
         }
-        if (poster != null && poster.contains("pic.gyezpb.cn")) {
+        if (poster != null && PIC_HOST.containsMatchIn(poster)) {
             poster = decryptImage(poster) ?: poster
         }
         val synopsis = Regex("meta name=\"description\" content=\"([^\"]*)\"")
@@ -173,7 +176,7 @@ class MrdsProvider : HikariProvider {
                 ?: continue
             var poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(block)?.groupValues?.get(1)
-            if (poster != null && poster.contains("pic.gyezpb.cn")) {
+            if (poster != null && PIC_HOST.containsMatchIn(poster)) {
                 poster = decryptImage(poster) ?: poster
             }
             out[href] = HikariMedia(
@@ -186,18 +189,30 @@ class MrdsProvider : HikariProvider {
         return out.values.toList()
     }
 
-    /** Decrypts the AES-encrypted poster bytes served by pic.gyezpb.cn. */
+    /** Decrypts the AES-encrypted poster bytes served by the pic.* hosts.
+     *  Returns null when the bytes are already a plain image (or undecodable)
+     *  so callers fall back to the raw URL. */
     private suspend fun decryptImage(url: String): String? = try {
         val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$BASE/")) ?: return null
+        if (isImageBytes(bytes)) return null
         val key = SecretKeySpec(IMG_KEY.toByteArray(), "AES")
         val iv = IvParameterSpec(IMG_IV.toByteArray())
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, key, iv)
         val decrypted = cipher.doFinal(bytes)
+        if (!isImageBytes(decrypted)) return null
         val ext = url.substringAfterLast(".", "jpeg").substringBefore("?")
         "data:image/$ext;base64," + Base64.encodeToString(decrypted, Base64.NO_WRAP)
     } catch (e: Exception) {
         null
+    }
+
+    private fun isImageBytes(b: ByteArray): Boolean {
+        if (b.size < 12) return false
+        return (b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte()) ||
+            (b[0] == 0x89.toByte() && b[1] == 0x50.toByte() && b[2] == 0x4E.toByte() && b[3] == 0x47.toByte()) ||
+            (b[0] == 0x47.toByte() && b[1] == 0x49.toByte() && b[2] == 0x46.toByte()) ||
+            (b[0] == 0x52.toByte() && b[1] == 0x49.toByte() && b[2] == 0x46.toByte() && b[3] == 0x46.toByte())
     }
 
     /** Best-effort Chinese→English title/synopsis translation (cached). */
