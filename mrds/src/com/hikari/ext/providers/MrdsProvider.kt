@@ -24,7 +24,7 @@ import javax.crypto.spec.SecretKeySpec
  *  - search:            `https://mrds.com/search/<query>/`  → `.../<n>/`
  *  - a post page (`/archives/<id>/`) embeds a DPlayer whose `data-config`
  *    JSON holds the signed `hls.dscxru.cn/...m3u8` stream.
- *  - post images live on `pic.wxxrrip.cn` AES-encrypted (key/iv baked into
+ *  - post images live on `pic.gyezpb.cn` AES-encrypted (key/iv baked into
  *    the page) and must be decrypted to render.
  *
  * getCatalog/search take a page argument, so the app's own pagination is
@@ -36,7 +36,7 @@ class MrdsProvider : HikariProvider {
     override val name = "MRDS"
     override val mainUrl = "https://mrds.com"
     override val description = "Daily contest & gossip videos from mrds.com — 21 category walls plus search, direct HLS streams."
-    override val version = 1
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -105,7 +105,7 @@ class MrdsProvider : HikariProvider {
             poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(page)?.groupValues?.get(1)
         }
-        if (poster != null && poster.contains("pic.wxxrrip.cn")) {
+        if (poster != null && poster.contains("pic.gyezpb.cn")) {
             poster = decryptImage(poster) ?: poster
         }
         val synopsis = Regex("meta name=\"description\" content=\"([^\"]*)\"")
@@ -173,7 +173,7 @@ class MrdsProvider : HikariProvider {
                 ?: continue
             var poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(block)?.groupValues?.get(1)
-            if (poster != null && poster.contains("pic.wxxrrip.cn")) {
+            if (poster != null && poster.contains("pic.gyezpb.cn")) {
                 poster = decryptImage(poster) ?: poster
             }
             out[href] = HikariMedia(
@@ -186,7 +186,7 @@ class MrdsProvider : HikariProvider {
         return out.values.toList()
     }
 
-    /** Decrypts the AES-encrypted poster bytes served by pic.wxxrrip.cn. */
+    /** Decrypts the AES-encrypted poster bytes served by pic.gyezpb.cn. */
     private suspend fun decryptImage(url: String): String? = try {
         val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$BASE/")) ?: return null
         val key = SecretKeySpec(IMG_KEY.toByteArray(), "AES")

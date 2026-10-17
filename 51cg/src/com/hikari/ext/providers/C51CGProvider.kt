@@ -17,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * 51CG (51cg1.com) — daily-contest / gossip blacklist video site (same Mirages
- * theme + DPlayer + AES-encrypted pic.wxxrrip.cn posters as MRDS).
+ * theme + DPlayer + AES-encrypted pic.gyezpb.cn posters as MRDS).
  *
  * Native Hikari extension (no CloudStream dependency). Plain server-rendered HTML:
  *  - home:           `https://51cg1.com/`           → `.../page/<n>/`
@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec
  *  - search:         `https://51cg1.com/search/<q>/` → `.../<n>/`
  *  - a post page (`/archives/<id>/`) embeds a DPlayer whose `data-config`
  *    JSON holds the signed HLS m3u8 stream.
- *  - post images live on `pic.wxxrrip.cn` AES-encrypted and must be decrypted.
+ *  - post images live on `pic.gyezpb.cn` AES-encrypted and must be decrypted.
  *
  * getCatalog/search take a page argument, so the app's own pagination is
  * unlimited (page 1..N until the site returns no more cards).
@@ -36,7 +36,7 @@ class C51CGProvider : HikariProvider {
     override val name = "51CG"
     override val mainUrl = "https://51cg1.com"
     override val description = "Daily contest & gossip videos from 51cg1.com — 27 category walls plus search, direct HLS streams."
-    override val version = 1
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
 
@@ -114,7 +114,7 @@ class C51CGProvider : HikariProvider {
             poster = Regex("meta itemprop=\"image\" content=\"([^\"]+)\"")
                 .find(page)?.groupValues?.get(1)
         }
-        if (poster != null && poster.contains("pic.wxxrrip.cn")) {
+        if (poster != null && poster.contains("pic.gyezpb.cn")) {
             poster = decryptImage(poster) ?: poster
         }
         val synopsis = Regex("meta name=\"description\" content=\"([^\"]*)\"")
@@ -229,7 +229,7 @@ class C51CGProvider : HikariProvider {
                 ?: continue
             var poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(block)?.groupValues?.get(1)
-            if (poster != null && poster.contains("pic.wxxrrip.cn")) {
+            if (poster != null && poster.contains("pic.gyezpb.cn")) {
                 poster = decryptImage(poster) ?: poster
             }
             out[href] = HikariMedia(
@@ -242,7 +242,7 @@ class C51CGProvider : HikariProvider {
         return out.values.toList()
     }
 
-    /** Decrypts the AES-encrypted poster bytes served by pic.wxxrrip.cn. */
+    /** Decrypts the AES-encrypted poster bytes served by pic.gyezpb.cn. */
     private suspend fun decryptImage(url: String): String? = try {
         val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$BASE/")) ?: return null
         val key = SecretKeySpec(IMG_KEY.toByteArray(), "AES")
