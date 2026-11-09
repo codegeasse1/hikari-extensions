@@ -1,5 +1,5 @@
 {
   "name": "MRDS",
-  "version": 4,
+  "version": 5,
   "mainClass": "com.hikari.ext.providers.MrdsProvider"
 }

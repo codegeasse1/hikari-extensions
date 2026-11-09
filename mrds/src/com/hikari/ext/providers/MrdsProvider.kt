@@ -36,7 +36,7 @@ class MrdsProvider : HikariProvider {
     override val name = "MRDS"
     override val mainUrl = "https://mrds.com"
     override val description = "Daily contest & gossip videos from mrds.com — 21 category walls plus search, direct HLS streams."
-    override val version = 4
+    override val version = 5
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -45,6 +45,17 @@ class MrdsProvider : HikariProvider {
         private const val BASE = "https://mrds.com"
         private const val CACHE_TTL_MS = 600_000L
         private val htmlCache = HashMap<String, Pair<Long, String>>()
+        private const val HTML_CACHE_MAX = 20
+        /** Decrypted posters, keyed by source URL: a home load materializes
+         *  hundreds of cards, and re-downloading + re-decrypting every poster
+         *  on every load is the transient churn that fragments the heap.
+         *  Bounded: 64 entries of ~200KB strings ≈ 13MB worst case. */
+        private const val POSTER_MEM_MAX = 64
+        private val posterCache = object : LinkedHashMap<String, String>(POSTER_MEM_MAX, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean =
+                size > POSTER_MEM_MAX
+        }
+        private val posterCacheMutex = Mutex()
         private val cacheMutex = Mutex()
         private val translateCache = HashMap<String, String>()
         private val translateMutex = Mutex()
@@ -108,6 +119,10 @@ class MrdsProvider : HikariProvider {
             poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(page)?.groupValues?.get(1)
         }
+        if (poster.isNullOrBlank()) {
+            poster = Regex("x-bg-loader-url\\s*=\\s*\"([^\"]+)\"")
+                .find(page)?.groupValues?.get(1)
+        }
         if (poster != null && PIC_HOST.containsMatchIn(poster)) {
             poster = decryptImage(poster) ?: poster
         }
@@ -156,7 +171,7 @@ class MrdsProvider : HikariProvider {
         }
         val html = HikariNet.getStringSmart(url) ?: return null
         cacheMutex.withLock {
-            if (htmlCache.size > 60) htmlCache.clear()
+            if (htmlCache.size > HTML_CACHE_MAX) htmlCache.clear()
             htmlCache[url] = now to html
         }
         return html
@@ -176,6 +191,12 @@ class MrdsProvider : HikariProvider {
                 ?: continue
             var poster = Regex("loadBannerDirect\\s*\\(\\s*['\"]([^'\"]+)['\"]")
                 .find(block)?.groupValues?.get(1)
+            if (poster.isNullOrBlank()) {
+                // Sister site 51cg already flipped its grids to
+                // x-bg-loader-url (Nov 2026); read it when present.
+                poster = Regex("x-bg-loader-url\\s*=\\s*\"([^\"]+)\"")
+                    .find(block)?.groupValues?.get(1)
+            }
             if (poster != null && PIC_HOST.containsMatchIn(poster)) {
                 poster = decryptImage(poster) ?: poster
             }
@@ -190,9 +211,20 @@ class MrdsProvider : HikariProvider {
     }
 
     /** Decrypts the AES-encrypted poster bytes served by the pic.* hosts.
-     *  Returns null when the bytes are already a plain image (or undecodable)
-     *  so callers fall back to the raw URL. */
-    private suspend fun decryptImage(url: String): String? = try {
+     *  Results are memoized (bounded LRU): the same poster URL is asked for
+     *  on every home load, search and detail open, and each answer used to
+     *  cost a download + decrypt + base64 triple allocation. Nulls are not
+     *  cached — a plain image falls back to its raw URL every time. */
+    private suspend fun decryptImage(url: String): String? {
+        posterCacheMutex.withLock { posterCache[url]?.let { return it } }
+        val out = decryptImageFresh(url)
+        if (out != null) {
+            posterCacheMutex.withLock { posterCache[url] = out }
+        }
+        return out
+    }
+
+    private suspend fun decryptImageFresh(url: String): String? = try {
         val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$BASE/")) ?: return null
         if (isImageBytes(bytes)) return null
         val key = SecretKeySpec(IMG_KEY.toByteArray(), "AES")
