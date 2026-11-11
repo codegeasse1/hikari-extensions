@@ -1,0 +1,5 @@
+{
+  "name": "91三级片",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.SanjiProvider"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "CZSAV",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.CzsavProvider"
+}

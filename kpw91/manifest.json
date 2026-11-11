@@ -1,0 +1,5 @@
+{
+  "name": "91看片网",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.Kpw91Provider"
+}

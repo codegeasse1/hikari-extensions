@@ -1,0 +1,5 @@
+{
+  "name": "91社",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.She91Provider"
+}
