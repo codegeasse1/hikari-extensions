@@ -1,5 +1,6 @@
 package com.hikari.ext.providers
 
+import android.util.Base64
 import com.hikari.ext.HikariCatalog
 import com.hikari.ext.HikariEpisode
 import com.hikari.ext.HikariMedia
@@ -7,6 +8,13 @@ import com.hikari.ext.HikariMediaType
 import com.hikari.ext.HikariNet
 import com.hikari.ext.HikariProvider
 import com.hikari.ext.HikariStream
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -29,6 +37,9 @@ import javax.crypto.spec.SecretKeySpec
  *                 -> {info:{id, title, cover_url, play_url, play_from},
  *                     next, prev}; play_url is "ep$detailUrl[#ep$detailUrl...]".
  *  - resolve:     GET /api/parse_video?url=<detailUrl> -> {m3u8_url}
+ *  Cover images come down AES-encrypted (same key/iv as the MRDS/51CG poster
+ *  scheme) and are decrypted in-extension to data: URIs; plain covers pass
+ *  through untouched.
  *  Pages are sequential (1..N until list is empty) — unlimited.
  */
 class DjuProvider : HikariProvider {
@@ -37,12 +48,28 @@ class DjuProvider : HikariProvider {
     override val name = "91DJU"
     override val mainUrl = "https://bwkalr.91dju.cyou"
     override val description = "91短剧 videos: latest wall, 10 category walls + search — direct m3u8, unlimited pages."
-    override val version = 1
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     companion object {
         private const val AES_KEY = "a9yX32LpQvUt7wBc"
         private const val AES_IV = "N7cPk2Bv38hWqFzM"
+        /** Cover images are AES-encrypted at rest (same key/iv as the
+         *  MRDS/51CG poster scheme — same operator backend): raw bytes must
+         *  be decrypted to render. NoPadding: JPEGs are block-aligned. */
+        private const val IMG_KEY = "f5d965df75336270"
+        private const val IMG_IV = "97b60394abc2fbe1"
+        /** Decrypted covers, keyed by source URL: a home load materializes
+         *  hundreds of cards; re-downloading + re-decrypting every cover on
+         *  every load would trash the heap. Bounded LRU. */
+        private const val COVER_MEM_MAX = 64
+        private val coverCache = object : LinkedHashMap<String, String>(COVER_MEM_MAX, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean =
+                size > COVER_MEM_MAX
+        }
+        private val coverCacheMutex = Mutex()
+        /** Bounds concurrent cover decrypts (polite to the pic CDN). */
+        private val coverPermits = Semaphore(6)
     }
 
     override fun catalogs(): List<HikariCatalog> = listOf(
@@ -79,9 +106,10 @@ class DjuProvider : HikariProvider {
 
     override suspend fun getMeta(media: HikariMedia): HikariMedia {
         val info = movieInfo(media.id) ?: return media
+        val rawCover = info.optString("cover_url").takeIf { it.isNotBlank() }
         return media.copy(
             title = info.optString("title").ifBlank { media.title },
-            posterUrl = info.optString("cover_url").takeIf { it.isNotBlank() } ?: media.posterUrl,
+            posterUrl = (rawCover?.let { decryptCover(it) } ?: rawCover) ?: media.posterUrl,
         )
     }
 
@@ -114,23 +142,35 @@ class DjuProvider : HikariProvider {
 
     // ---- API plumbing ----
 
-    private fun parseList(arr: JSONArray?): List<HikariMedia> {
+    private suspend fun parseList(arr: JSONArray?): List<HikariMedia> {
         if (arr == null) return emptyList()
-        val out = ArrayList<HikariMedia>(arr.length())
+        data class Card(val id: String, val title: String, val cover: String?)
+        val cards = ArrayList<Card>(arr.length())
         for (i in 0 until arr.length()) {
             val v = arr.optJSONObject(i) ?: continue
             val id = v.opt("id")?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: continue
             val title = v.optString("title").trim().ifBlank { continue }
-            out.add(
-                HikariMedia(
-                    id = id,
-                    title = title,
-                    type = HikariMediaType.MOVIE,
-                    posterUrl = v.optString("cover_url").takeIf { it.isNotBlank() },
-                ),
+            cards.add(Card(id, title, v.optString("cover_url").takeIf { it.isNotBlank() }))
+        }
+        // Covers are ciphertext until decrypted (see companion): resolve them
+        // concurrently under a bound so a 20-card page stays well inside the
+        // app's per-page budget.
+        val covers = coroutineScope {
+            cards.map { card ->
+                async {
+                    val c = card.cover
+                    if (c != null) coverPermits.withPermit { decryptCover(c) } ?: c else c
+                }
+            }.awaitAll()
+        }
+        return cards.mapIndexed { i, card ->
+            HikariMedia(
+                id = card.id,
+                title = card.title,
+                type = HikariMediaType.MOVIE,
+                posterUrl = covers[i],
             )
         }
-        return out
     }
 
     private suspend fun movieInfo(id: String): JSONObject? {
@@ -187,5 +227,45 @@ class DjuProvider : HikariProvider {
         String(cipher.doFinal(raw), Charsets.UTF_8)
     } catch (e: Exception) {
         null
+    }
+
+    /**
+     * Decrypts an AES-encrypted cover served by the pic.* CDN (the site's own
+     * loader does exactly this before handing bytes to its image view).
+     * Results are memoized (bounded LRU). Returns null when the bytes are
+     * already a plain image or the download/decrypt fails — callers then
+     * fall back to the raw URL.
+     */
+    private suspend fun decryptCover(url: String): String? {
+        coverCacheMutex.withLock { coverCache[url]?.let { return it } }
+        val out = decryptCoverFresh(url)
+        if (out != null) {
+            coverCacheMutex.withLock { coverCache[url] = out }
+        }
+        return out
+    }
+
+    private suspend fun decryptCoverFresh(url: String): String? = try {
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/")) ?: return null
+        if (isImageBytes(bytes)) return url
+        val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            SecretKeySpec(IMG_KEY.toByteArray(Charsets.UTF_8), "AES"),
+            IvParameterSpec(IMG_IV.toByteArray(Charsets.UTF_8)),
+        )
+        val decrypted = cipher.doFinal(bytes)
+        if (!isImageBytes(decrypted)) return null
+        "data:image/jpeg;base64," + Base64.encodeToString(decrypted, Base64.NO_WRAP)
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun isImageBytes(b: ByteArray): Boolean {
+        if (b.size < 12) return false
+        return (b[0] == 0xFF.toByte() && b[1] == 0xD8.toByte()) ||
+            (b[0] == 0x89.toByte() && b[1] == 0x50.toByte() && b[2] == 0x4E.toByte() && b[3] == 0x47.toByte()) ||
+            (b[0] == 0x47.toByte() && b[1] == 0x49.toByte() && b[2] == 0x46.toByte()) ||
+            (b[0] == 0x52.toByte() && b[1] == 0x49.toByte() && b[2] == 0x46.toByte() && b[3] == 0x46.toByte())
     }
 }
