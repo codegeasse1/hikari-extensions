@@ -8,8 +8,13 @@ import com.hikari.ext.HikariMediaType
 import com.hikari.ext.HikariNet
 import com.hikari.ext.HikariProvider
 import com.hikari.ext.HikariStream
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import java.net.URLEncoder
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -28,7 +33,11 @@ import javax.crypto.spec.SecretKeySpec
  *    the page) and must be decrypted to render.
  *
  * getCatalog/search take a page argument, so the app's own pagination is
- * unlimited (page 1..N until the site returns no more cards).
+ * unlimited (page 1..N until the site returns no more cards). parseCards is
+ * written for that: posters decrypt concurrently under a bound (a sequential
+ * download+decrypt per card used to blow the app's per-page budget and stall
+ * pagination after a few pages), and titles are returned untranslated — the
+ * app translates list results itself.
  */
 class MrdsProvider : HikariProvider {
 
@@ -36,7 +45,7 @@ class MrdsProvider : HikariProvider {
     override val name = "MRDS"
     override val mainUrl = "https://mrds.com"
     override val description = "Daily contest & gossip videos from mrds.com — 21 category walls plus search, direct HLS streams."
-    override val version = 5
+    override val version = 6
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -57,6 +66,10 @@ class MrdsProvider : HikariProvider {
         }
         private val posterCacheMutex = Mutex()
         private val cacheMutex = Mutex()
+        /** Bounds concurrent poster decrypts: polite to the pic.* CDN and to
+         *  mobile radios, while keeping a 30-card page inside the app's
+         *  per-page budget (sequential downloads stalled pagination). */
+        private val posterPermits = Semaphore(6)
         private val translateCache = HashMap<String, String>()
         private val translateMutex = Mutex()
         private const val IMG_KEY = "f5d965df75336270"
@@ -177,9 +190,15 @@ class MrdsProvider : HikariProvider {
         return html
     }
 
-    /** Extracts the video-card grid from a list/search page. Skips ad articles. */
+    /** Extracts the video-card grid from a list/search page. Skips ad articles.
+     *  Two phases: first collect every card's raw fields with zero network,
+     *  then decrypt the posters concurrently under [posterPermits]. The old
+     *  code did a sequential download+decrypt AND a translate call per card,
+     *  so a 30-card page routinely exceeded the app's per-page budget and
+     *  pagination stalled after a few pages. Titles are returned raw — the
+     *  app translates list results itself. */
     private suspend fun parseCards(html: String): List<HikariMedia> {
-        val out = LinkedHashMap<String, HikariMedia>()
+        val cards = LinkedHashMap<String, Card>()
         val articleRe = Regex("<article(?![^>]*ad-item)[^>]*>([\\s\\S]*?)</article>")
         for (m in articleRe.findAll(html)) {
             val block = m.groupValues[1]
@@ -197,18 +216,31 @@ class MrdsProvider : HikariProvider {
                 poster = Regex("x-bg-loader-url\\s*=\\s*\"([^\"]+)\"")
                     .find(block)?.groupValues?.get(1)
             }
-            if (poster != null && PIC_HOST.containsMatchIn(poster)) {
-                poster = decryptImage(poster) ?: poster
-            }
-            out[href] = HikariMedia(
-                id = href,
-                title = translate(rawTitle) ?: rawTitle,
+            cards[href] = Card(href, rawTitle, poster)
+        }
+        val posters = coroutineScope {
+            cards.values.map { card ->
+                async {
+                    val p = card.poster
+                    if (p != null && PIC_HOST.containsMatchIn(p)) {
+                        posterPermits.withPermit { decryptImage(p) } ?: p
+                    } else {
+                        p
+                    }
+                }
+            }.awaitAll()
+        }
+        return cards.values.mapIndexed { i, card ->
+            HikariMedia(
+                id = card.id,
+                title = card.title,
                 type = HikariMediaType.MOVIE,
-                posterUrl = poster,
+                posterUrl = posters[i],
             )
         }
-        return out.values.toList()
     }
+
+    private data class Card(val id: String, val title: String, val poster: String?)
 
     /** Decrypts the AES-encrypted poster bytes served by the pic.* hosts.
      *  Results are memoized (bounded LRU): the same poster URL is asked for
