@@ -310,7 +310,7 @@ class PpJavProvider : HikariProvider {
     private fun md5(s: String): String {
         val d = MessageDigest.getInstance("MD5").digest(s.toByteArray(Charsets.UTF_8))
         return buildString(d.size * 2) {
-            for (b) {
+            for (b in d) {
                 val v = b.toInt() and 0xFF
                 if (v < 16) append('0')
                 append(v.toString(16))
