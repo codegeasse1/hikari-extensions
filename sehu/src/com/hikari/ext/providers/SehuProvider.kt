@@ -108,8 +108,7 @@ class SehuProvider : HikariProvider {
         val vd = detail.optJSONObject("videoDetail") ?: return media
         val desc = vd.optString("description").trim()
         val tags = vd.optString("tags").trim()
-        val overview = listOf(desc, tags.takeIf { it.isNotBlank() }?.let { "Tags: $it" })
-            .filter { it.isNotBlank() }
+        val overview = listOfNotNull(desc.takeIf { it.isNotBlank() }, tags.takeIf { it.isNotBlank() }?.let { "Tags: $it" })
             .joinToString("\n\n")
         return media.copy(
             title = vd.optString("title").trim().takeIf { it.isNotBlank() } ?: media.title,
