@@ -1,5 +1,5 @@
 {
-  "name": "番号屋",
-  "version": 1,
+  "name": "FanHaoWu",
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.FanhaowuProvider"
 }

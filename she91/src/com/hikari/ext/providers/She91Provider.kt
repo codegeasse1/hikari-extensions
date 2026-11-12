@@ -24,15 +24,16 @@ import java.net.URLEncoder
 class She91Provider : HikariProvider {
 
     override val id = "she91"
-    override val name = "91社"
+    override val name = "91She"
     override val mainUrl = "https://9273.m256ed7n.cc"
-    override val description = "91社: 网红黑料与成人视频社区, 标签墙 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "91She: influencer leaks and adult video community, tag walls + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
+        private val BROWSER_UA by lazy { HikariNet.browserHeaders.getValue("User-Agent") }
         private val CELL_RE =
             Regex("data-src=\"([^\"]+)\"[^>]*?data-video=\"(/api/posts/(\\d+)/playback)[^\"]*\"")
         private val VIDEO_CELL_RE = Regex("data-video=\"(/api/posts/(\\d+)/playback)[^\"]*\"")
@@ -91,17 +92,24 @@ class She91Provider : HikariProvider {
     }
 
     override suspend fun getStreams(media: HikariMedia, episode: HikariEpisode?): List<HikariStream> {
-        val html = HikariNet.getStringSmart("$mainUrl/post/${media.id}/", referer()) ?: return emptyList()
-        val paths = MANIFEST_RE.findAll(html).map { it.groupValues[1] }.toList().distinct()
+        val raw = HikariNet.getStringSmart("$mainUrl/post/${media.id}/", referer()) ?: return emptyList()
+        // The manifest JSON is HTML-escaped in the page (&#34; instead of ").
+        val html = unesc(raw)
+        val cells = VIDEO_CELL_RE.findAll(html).map { it.groupValues[1] }.toList()
+        val manifested = MANIFEST_RE.findAll(html).map { it.groupValues[1] }.toList()
+        val paths = (cells + manifested).distinct()
         if (paths.isEmpty()) return emptyList()
         val out = ArrayList<HikariStream>()
         for (p in paths) {
             val url = playbackUrl(p) ?: continue
             out.add(
                 HikariStream(
-                    name = if (paths.size == 1) "91社" else "线路${out.size + 1}",
+                    name = if (paths.size == 1) "91She" else "91She-${out.size + 1}",
                     url = url,
-                    headers = mapOf("Referer" to "$mainUrl/"),
+                    headers = mapOf(
+                        "Referer" to "$mainUrl/",
+                        "User-Agent" to BROWSER_UA,
+                    ),
                     isM3u8 = url.contains(".m3u8"),
                 )
             )
@@ -147,7 +155,14 @@ class She91Provider : HikariProvider {
 
     private suspend fun playbackUrl(path: String): String? {
         val clean = path.substringBefore("#")
-        val body = HikariNet.getString(mainUrl + clean, referer()) ?: return null
+        val body = HikariNet.getString(
+            mainUrl + clean,
+            mapOf(
+                "Referer" to "$mainUrl/",
+                "User-Agent" to BROWSER_UA,
+                "Accept" to "application/json,*/*;q=0.8",
+            )
+        ) ?: return null
         val t = body.trim()
         if (t.startsWith("#EXTM3U")) {
             // Rare: the endpoint answers the playlist itself.

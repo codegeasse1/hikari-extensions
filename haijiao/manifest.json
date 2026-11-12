@@ -1,5 +1,5 @@
 {
-  "name": "海角社区",
-  "version": 1,
+  "name": "HaiJiao",
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.HaijiaoProvider"
 }

@@ -47,8 +47,8 @@ class DjuProvider : HikariProvider {
     override val id = "91dju"
     override val name = "91DJU"
     override val mainUrl = "https://bwkalr.91dju.cyou"
-    override val description = "91短剧 videos: latest wall, 10 category walls + search — direct m3u8, unlimited pages."
-    override val version = 2
+    override val description = "91 short dramas: latest wall, 10 category walls + search — direct m3u8, unlimited pages."
+    override val version = 3
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -246,7 +246,7 @@ class DjuProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/")) ?: return null
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/", "User-Agent" to HikariNet.browserHeaders.getValue("User-Agent"), "Accept" to "image/*,*/*;q=0.8")) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(

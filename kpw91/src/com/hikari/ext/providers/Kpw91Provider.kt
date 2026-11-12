@@ -22,21 +22,25 @@ import java.net.URLEncoder
 class Kpw91Provider : HikariProvider {
 
     override val id = "kpw91"
-    override val name = "91看片网"
+    override val name = "91KanPian"
     override val mainUrl = "https://ddza-e1.91kpw222.sbs"
-    override val description = "91看片网: 国产/日韩/欧美等 20+ 分类 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "91KanPian: Chinese/JP/KR/Western and 20+ more categories + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
 
     companion object {
         private const val BASE = "/91kp"
+        private val BROWSER_UA by lazy { HikariNet.browserHeaders.getValue("User-Agent") }
         private val CARD_RE = Regex(
-            "<dl>\\s*<dt[^>]*>\\s*<a[^>]*href=\"([^\"]+/vod/detail/id/(\\d+)\\.html)\"[^>]*>" +
-                "[\\s\\S]{0,600}?<img[^>]*?(?:data-original|src)=\"([^\"]+)\"" +
-                "[\\s\\S]{0,600}?</dt>\\s*<dd>\\s*<a[^>]*>(?:<h3>)?([^<]{2,120})(?:</h3>)?"
+            "<dl[^>]*>\\s*<dt[^>]*>\\s*<a[^>]*href=\"([^\"]+/vod/detail/id/(\\d+)\\.html)\"[^>]*>" +
+                "[\\s\\S]{0,900}?<img[^>]*?(?:data-original|src)=\"([^\"]+)\"" +
+                "[\\s\\S]{0,900}?</dt>\\s*<dd>\\s*<a[^>]*>(?:<h3>)?([^<]{2,120})(?:</h3>)?"
         )
+        private val BLOCK_ID_RE = Regex("/vod/detail/id/(\\d+)\\.html")
+        private val BLOCK_IMG_RE = Regex("(?:data-original|src)=\"(https?://[^\"]+)\"")
+        private val BLOCK_H3_RE = Regex("<h3>([^<]{2,120})</h3>")
         private val PLAY_RE = Regex(
             "href=\"([^\"]+/vod/play/id/(\\d+)/sid/(\\d+)/nid/(\\d+)\\.html)\"[^>]*>([^<]{1,24})</a>"
         )
@@ -143,6 +147,26 @@ class Kpw91Provider : HikariProvider {
                 )
             )
         }
+        if (out.isNotEmpty()) return out
+        // Fallback: split on <dl blocks (menu <dl>s have no detail links).
+        for (block in html.split("<dl")) {
+            if (!block.contains("/vod/detail/id/")) continue
+            val idm = BLOCK_ID_RE.find(block) ?: continue
+            val id = idm.groupValues[1]
+            if (!seen.add(id)) continue
+            val cover = BLOCK_IMG_RE.find(block)?.groupValues?.get(1)?.trim()
+                ?.takeIf { it.startsWith("http") }
+            val title = BLOCK_H3_RE.find(block)?.groupValues?.get(1)
+                ?.let { unesc(it) }?.trim()?.takeIf { it.isNotBlank() } ?: continue
+            out.add(
+                HikariMedia(
+                    id = id,
+                    title = title,
+                    type = HikariMediaType.MOVIE,
+                    posterUrl = cover,
+                )
+            )
+        }
         return out
     }
 
@@ -153,7 +177,10 @@ class Kpw91Provider : HikariProvider {
         return url.takeIf { it.startsWith("http") }
     }
 
-    private fun referer(): Map<String, String> = mapOf("Referer" to "$mainUrl/")
+    private fun referer(): Map<String, String> = mapOf(
+        "Referer" to "$mainUrl/",
+        "User-Agent" to BROWSER_UA,
+    )
 
     private fun unesc(s: String): String = s
         .replace("&quot;", "\"").replace("&#34;", "\"").replace("&#39;", "'")

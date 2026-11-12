@@ -34,10 +34,10 @@ import javax.crypto.spec.SecretKeySpec
 class HaijiaoProvider : HikariProvider {
 
     override val id = "haijiao"
-    override val name = "海角社区"
+    override val name = "HaiJiao"
     override val mainUrl = "https://7b24b.hazottkc.cc"
-    override val description = "海角社区: 海角视频 + 海角短剧选集 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "HaiJiao: videos + drama series episodes + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE, HikariMediaType.SERIES)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? {
@@ -122,7 +122,7 @@ class HaijiaoProvider : HikariProvider {
         } ?: return emptyList()
         return listOf(
             HikariStream(
-                name = episode?.name?.takeIf { it.isNotBlank() } ?: "海角社区",
+                name = episode?.name?.takeIf { it.isNotBlank() } ?: "HaiJiao",
                 url = m3u8,
                 headers = mapOf("Referer" to "$mainUrl/"),
                 isM3u8 = true,
@@ -318,7 +318,7 @@ class HaijiaoProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, referer()) ?: return null
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/", "User-Agent" to HikariNet.browserHeaders.getValue("User-Agent"), "Accept" to "image/*,*/*;q=0.8")) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(

@@ -40,10 +40,10 @@ import javax.crypto.spec.SecretKeySpec
 class FanhaowuProvider : HikariProvider {
 
     override val id = "fanhaowu"
-    override val name = "番号屋"
+    override val name = "FanHaoWu"
     override val mainUrl = "https://ulwr4q.fanhaowu1.cyou"
-    override val description = "番号屋 videos: 最新 wall, 20+ 分类 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "FanHaoWu videos: latest wall, 20+ categories + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -129,7 +129,7 @@ class FanhaowuProvider : HikariProvider {
         if (m3u8.isBlank()) return emptyList()
         return listOf(
             HikariStream(
-                name = episode?.name?.takeIf { it.isNotBlank() } ?: "番号屋",
+                name = episode?.name?.takeIf { it.isNotBlank() } ?: "FanHaoWu",
                 url = m3u8,
                 headers = mapOf("Referer" to "$mainUrl/"),
                 isM3u8 = true,
@@ -227,7 +227,7 @@ class FanhaowuProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/")) ?: return null
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/", "User-Agent" to HikariNet.browserHeaders.getValue("User-Agent"), "Accept" to "image/*,*/*;q=0.8")) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(

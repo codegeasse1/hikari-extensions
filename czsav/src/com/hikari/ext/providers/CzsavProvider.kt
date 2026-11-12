@@ -42,8 +42,8 @@ class CzsavProvider : HikariProvider {
     override val id = "czsav"
     override val name = "CZSAV"
     override val mainUrl = "https://igo1oi.czsav.icu"
-    override val description = "CZSAV videos: 最新 wall, 20 分类 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "CZSAV videos: latest wall, 20 categories + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     companion object {
@@ -223,7 +223,7 @@ class CzsavProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/")) ?: return null
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/", "User-Agent" to HikariNet.browserHeaders.getValue("User-Agent"), "Accept" to "image/*,*/*;q=0.8")) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(

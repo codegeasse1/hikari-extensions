@@ -32,10 +32,10 @@ import javax.crypto.spec.SecretKeySpec
 class TanhuaProvider : HikariProvider {
 
     override val id = "tanhua"
-    override val name = "91探花"
+    override val name = "91TanHua"
     override val mainUrl = "https://911tanhua.com"
-    override val description = "91探花: 国产探花 14 频道 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "91TanHua: Chinese adventure, 14 channels + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -108,7 +108,7 @@ class TanhuaProvider : HikariProvider {
         val m3u8 = direct ?: embedM3u8(html) ?: return emptyList()
         return listOf(
             HikariStream(
-                name = "91探花",
+                name = "91TanHua",
                 url = m3u8,
                 headers = mapOf("Referer" to "$mainUrl/"),
                 isM3u8 = m3u8.contains(".m3u8"),
@@ -268,7 +268,7 @@ class TanhuaProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, referer()) ?: return null
+        val bytes = HikariNet.getBytes(url, mapOf("Referer" to "$mainUrl/", "User-Agent" to HikariNet.browserHeaders.getValue("User-Agent"), "Accept" to "image/*,*/*;q=0.8")) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(

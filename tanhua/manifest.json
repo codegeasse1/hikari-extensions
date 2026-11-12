@@ -1,5 +1,5 @@
 {
-  "name": "91探花",
-  "version": 1,
+  "name": "91TanHua",
+  "version": 2,
   "mainClass": "com.hikari.ext.providers.TanhuaProvider"
 }

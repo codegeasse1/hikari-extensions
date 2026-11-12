@@ -32,10 +32,10 @@ import javax.crypto.spec.SecretKeySpec
 class SanjiProvider : HikariProvider {
 
     override val id = "sanji"
-    override val name = "91三级片"
+    override val name = "91SanJi"
     override val mainUrl = "https://91sanji.com"
-    override val description = "91三级片: 国产/香港/日本/韩国/欧美/东南亚三级 + 搜索 — 直接 m3u8, 无限翻页."
-    override val version = 1
+    override val description = "91SanJi: Chinese/HK/JP/KR/Western/SEA Category-III movies + search — direct m3u8, unlimited pages."
+    override val version = 2
     override val tvTypes = setOf(HikariMediaType.MOVIE)
 
     override suspend fun getEpisodes(media: HikariMedia): List<HikariEpisode>? = null
@@ -52,6 +52,10 @@ class SanjiProvider : HikariProvider {
         private val coverPermits = Semaphore(6)
 
         private val HREF_RE = Regex("href=\"(/video/(\\d+)/)\"")
+        private val ARIA_RE = Regex("aria-label=\"播放《([^》]{1,80})》\"")
+        private val ALT_RE = Regex("alt=\"《([^》]{1,80})》封面\"")
+        private val ANCHOR_TITLE_RE = Regex("video-card__title\"[^>]*>([^<]{1,80})<")
+        private val BROWSER_UA by lazy { HikariNet.browserHeaders.getValue("User-Agent") }
         private val TITLE_RE = Regex("title=\"([^\"]{2,150})\"")
         private val COVER_RE = Regex("(?:data-enc-src|data-src)=\"([^\"]+)\"")
         private val DURATION_RE = Regex("<span[^>]*class=\"duration\"[^>]*>([^<]{1,12})</span>")
@@ -101,7 +105,7 @@ class SanjiProvider : HikariProvider {
             ?: embedM3u8(html) ?: return emptyList()
         return listOf(
             HikariStream(
-                name = "91三级片",
+                name = "91SanJi",
                 url = m3u8,
                 headers = mapOf("Referer" to "$mainUrl/"),
                 isM3u8 = m3u8.contains(".m3u8"),
@@ -123,8 +127,11 @@ class SanjiProvider : HikariProvider {
             val href = HREF_RE.find(part) ?: continue
             val id = href.groupValues[2]
             if (!seen.add(id)) continue
-            val title = TITLE_RE.find(part)?.groupValues?.get(1)?.let { unesc(it) }?.trim()
-                ?.takeIf { it.isNotBlank() }
+            val title = ARIA_RE.find(part)?.groupValues?.get(1)?.trim()
+                ?: ALT_RE.find(part)?.groupValues?.get(1)?.trim()
+                ?: ANCHOR_TITLE_RE.find(part)?.groupValues?.get(1)?.let { unesc(it) }?.trim()
+                ?: TITLE_RE.find(part)?.groupValues?.get(1)?.let { unesc(it) }?.trim()
+                    ?.takeIf { it.isNotBlank() }
                 ?: names["/video/$id/"] ?: continue
             val cover = COVER_RE.find(part)?.groupValues?.get(1)
             out.add(Card(id, title, cover))
@@ -218,6 +225,12 @@ class SanjiProvider : HikariProvider {
 
     private fun referer(): Map<String, String> = mapOf("Referer" to "$mainUrl/")
 
+    private fun imgHeaders(): Map<String, String> = mapOf(
+        "Referer" to "$mainUrl/",
+        "User-Agent" to BROWSER_UA,
+        "Accept" to "image/*,*/*;q=0.8",
+    )
+
     private fun unesc(s: String): String = s
         .replace("&quot;", "\"").replace("&#34;", "\"").replace("&#39;", "'")
         .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
@@ -268,7 +281,7 @@ class SanjiProvider : HikariProvider {
     }
 
     private suspend fun decryptCoverFresh(url: String): String? = try {
-        val bytes = HikariNet.getBytes(url, referer()) ?: return null
+        val bytes = HikariNet.getBytes(url, imgHeaders()) ?: return null
         if (isImageBytes(bytes)) return url
         val cipher = Cipher.getInstance("AES/CBC/NoPadding")
         cipher.init(
