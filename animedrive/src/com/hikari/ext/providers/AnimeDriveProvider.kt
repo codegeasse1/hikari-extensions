@@ -86,11 +86,13 @@ class AnimeDriveProvider : HikariProvider {
         val out = ArrayList<Card>()
         val seen = HashSet<String>()
         val blocks = Regex(
-            """<article[^>]*class="[^"]*ast-archive-post[^"]*"[^>]*>(.*?)</article>""",
+            """<article[^>]*class="([^"]*)"[^>]*>(.*?)</article>""",
             setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
         ).findAll(html)
         for (b in blocks) {
-            val body = b.groupValues[1]
+            val artClass = b.groupValues[1]
+            if (!artClass.contains("ast-archive-post")) continue
+            val body = b.groupValues[2]
             val link = Regex(
                 """<h2[^>]*class="[^"]*entry-title[^"]*"[^>]*>.*?<a[^>]*href="([^"]+)"""",
                 setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
@@ -101,7 +103,9 @@ class AnimeDriveProvider : HikariProvider {
                 setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE),
             ).find(body)?.groupValues?.get(1) ?: continue
             val title = unesc(strip(rawTitle)).takeIf { it.isNotBlank() } ?: continue
-            val movie = body.contains("/category/movie")
+            // The article's own category classes decide movie vs series —
+            // never the whole page (the nav menu links /category/movie/ everywhere).
+            val movie = Regex("""\bcategory-movie\b""").containsMatchIn(artClass)
             out.add(Card(title, link, firstRealImg(body), movie))
         }
         return out
@@ -188,7 +192,11 @@ class AnimeDriveProvider : HikariProvider {
             .findAll(html).map { unesc(it.groupValues[1].trim()) }.filter {
                 it.isNotBlank() && !it.contains("Download", true) && !it.contains("Anime", true)
             }.distinct().take(8).toList()
-        val type = if (html.contains("/category/movie")) HikariMediaType.MOVIE else media.type
+        val type = run {
+            val artClass = Regex("""<article[^>]*class="([^"]*)"""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.get(1).orEmpty()
+            if (Regex("""\bcategory-movie\b""").containsMatchIn(artClass)) HikariMediaType.MOVIE else media.type
+        }
         return media.copy(
             title = title.takeIf { it.isNotBlank() } ?: media.title,
             type = type, posterUrl = poster, backdropUrl = poster,
@@ -218,7 +226,7 @@ class AnimeDriveProvider : HikariProvider {
     /** Parses the landing page's .adc-ep blocks into episodes with FilePress files. */
     private fun episodesOf(linkHtml: String): List<EpLinks> {
         val out = ArrayList<EpLinks>()
-        val chunks = linkHtml.split("""<div class="adc-ep">""").drop(1)
+        val chunks = linkHtml.split(Regex("""<div[^>]*class="[^"]*adc-ep[^"]*"[^>]*>""")).drop(1)
         var order = 0
         for (ch in chunks) {
             order++
@@ -336,6 +344,7 @@ class AnimeDriveProvider : HikariProvider {
                     .put("id", fileId)
                     .put("method", m)
                     .put("captchaValue", JSONObject.NULL)
+                    .put("referrer", fileUrl)
                     .toString()
                 val initial = HikariNet.postString(
                     "$origin/api/file/downlaod/", payload, apiHeaders,
@@ -375,6 +384,11 @@ class AnimeDriveProvider : HikariProvider {
         val files = eps.getOrNull(epIndex)?.files
             ?: eps.firstOrNull()?.files
             ?: return emptyList()
+        // Warm the host session once (the FileBee download API is
+        // cookie-aware; the web app always visits the file page first).
+        files.firstOrNull()?.url?.let { warm ->
+            runCatching { HikariNet.getString(warm, mapOf("User-Agent" to ua, "Referer" to linkPage)) }
+        }
         val out = ArrayList<HikariStream>()
         val seen = HashSet<String>()
         for (f in files) {
