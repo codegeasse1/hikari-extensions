@@ -1,0 +1,6 @@
+{
+  "name": "NetNaija-box",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.NetNaijaAppProvider",
+  "tvTypes": ["series", "movie"]
+}

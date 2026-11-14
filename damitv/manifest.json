@@ -1,0 +1,9 @@
+{
+  "name": "DamiTV",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.DamiTVProvider",
+  "tvTypes": [
+    "series",
+    "movie"
+  ]
+}

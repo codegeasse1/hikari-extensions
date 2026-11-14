@@ -1,0 +1,6 @@
+{
+  "name": "AniChan",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.AniChanProvider",
+  "tvTypes": ["series", "movie"]
+}

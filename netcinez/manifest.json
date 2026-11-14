@@ -1,0 +1,6 @@
+{
+  "name": "NetCinez",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.NetCinezProvider",
+  "tvTypes": ["series", "movie"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "MovieBox",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.MovieBoxProvider",
+  "tvTypes": ["series", "movie"]
+}

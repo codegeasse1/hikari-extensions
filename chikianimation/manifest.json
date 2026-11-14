@@ -1,0 +1,6 @@
+{
+  "name": "ChikiAnimation",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.ChikiAnimationProvider",
+  "tvTypes": ["series", "movie"]
+}

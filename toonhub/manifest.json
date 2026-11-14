@@ -1,0 +1,6 @@
+{
+  "name": "ToonHub",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.ToonHubProvider",
+  "tvTypes": ["series", "movie"]
+}

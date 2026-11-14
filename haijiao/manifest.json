@@ -1,0 +1,5 @@
+{
+  "name": "HaiJiao",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.HaijiaoProvider"
+}

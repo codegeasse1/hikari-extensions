@@ -1,0 +1,5 @@
+{
+  "name": "91SanJi",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.SanjiProvider"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "DonghuaStream",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.DonghuaStreamProvider",
+  "tvTypes": [
+    "series",
+    "movie"
+  ]
+}

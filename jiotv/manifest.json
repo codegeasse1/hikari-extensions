@@ -1,0 +1,6 @@
+{
+  "name": "JioTV",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.JioTVProvider",
+  "tvTypes": ["series", "movie"]
+}

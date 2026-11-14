@@ -1,0 +1,6 @@
+{
+  "name": "Kyren",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.KyrenProvider",
+  "tvTypes": ["series", "movie"]
+}

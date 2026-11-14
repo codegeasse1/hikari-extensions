@@ -1,0 +1,6 @@
+{
+  "name": "AnimeAv1",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimeAv1Provider",
+  "tvTypes": ["series", "movie"]
+}

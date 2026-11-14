@@ -1,0 +1,6 @@
+{
+  "name": "Netflix",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.NetflixProvider",
+  "tvTypes": ["series", "movie"]
+}

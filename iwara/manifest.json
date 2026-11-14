@@ -1,0 +1,6 @@
+{
+  "name": "Iwara",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.IwaraProvider",
+  "tvTypes": ["movie"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "SeHu",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.SehuProvider"
+}

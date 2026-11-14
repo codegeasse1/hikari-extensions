@@ -1,0 +1,6 @@
+{
+  "name": "CineFreak",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.CineFreakProvider",
+  "tvTypes": ["series", "movie"]
+}

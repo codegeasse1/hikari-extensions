@@ -1,0 +1,6 @@
+{
+  "name": "AnimeTH",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimeTHProvider",
+  "tvTypes": ["series", "movie"]
+}

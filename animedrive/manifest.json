@@ -1,0 +1,9 @@
+{
+  "name": "AnimeDrive",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.AnimeDriveProvider",
+  "tvTypes": [
+    "series",
+    "movie"
+  ]
+}

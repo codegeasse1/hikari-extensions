@@ -1,0 +1,5 @@
+{
+  "name": "91DJU",
+  "version": 3,
+  "mainClass": "com.hikari.ext.providers.DjuProvider"
+}

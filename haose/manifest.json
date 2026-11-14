@@ -1,0 +1,5 @@
+{
+  "name": "HaoSeTV",
+  "version": 2,
+  "mainClass": "com.hikari.ext.providers.HaoseProvider"
+}

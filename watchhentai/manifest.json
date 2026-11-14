@@ -1,0 +1,5 @@
+{
+  "name": "WatchHentai",
+  "version": 5,
+  "mainClass": "com.hikari.ext.providers.WatchhentaiProvider"
+}

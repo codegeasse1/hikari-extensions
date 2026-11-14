@@ -1,0 +1,6 @@
+{
+  "name": "Coflix",
+  "version": 1,
+  "mainClass": "com.hikari.ext.providers.CoflixProvider",
+  "tvTypes": ["series", "movie"]
+}
