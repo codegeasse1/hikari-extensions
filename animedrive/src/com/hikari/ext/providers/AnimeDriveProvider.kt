@@ -187,7 +187,7 @@ class AnimeDriveProvider : HikariProvider {
         val genres = Regex("""<a[^>]*href="[^"]*/category/[^"]*"[^>]*>([^<]+)</a>""", RegexOption.IGNORE_CASE)
             .findAll(html).map { unesc(it.groupValues[1].trim()) }.filter {
                 it.isNotBlank() && !it.contains("Download", true) && !it.contains("Anime", true)
-            }.distinct().take(8)
+            }.distinct().take(8).toList()
         val type = if (html.contains("/category/movie")) HikariMediaType.MOVIE else media.type
         return media.copy(
             title = title.takeIf { it.isNotBlank() } ?: media.title,
